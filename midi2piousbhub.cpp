@@ -408,11 +408,8 @@ rppicomidi::Midi2PioUsbhub::Midi2PioUsbhub() : cli{&preset_manager}
     attached_devices[uart_devaddr].configured = true;
     midi_in_port_list.push_back(&uart_midi_in_port);
     midi_out_port_list.push_back(&uart_midi_out_port);
-    printf("Cli is running.\r\n");
-    printf("Type \"help\" for a list of commands\r\n");
-    printf("Use backspace and tab to remove chars and autocomplete\r\n");
-    printf("Use up and down arrows to recall previous commands\r\n");
     preset_manager.init();
+    cli.printWelcome();
 }
 
 #if 0
@@ -490,11 +487,7 @@ void rppicomidi::Midi2PioUsbhub::task()
         int64_t diff = absolute_time_diff_us(previous_timestamp, now);
         if (diff > 1000000ll) {
             cli_up_message_pending = false;
-            printf("\r\n\r\n");
-            printf("Cli is running.\r\n");
-            printf("Type \"help\" for a list of commands\r\n");
-            printf("Use backspace and tab to remove chars and autocomplete\r\n");
-            printf("Use up and down arrows to recall previous commands\r\n");
+            cli.printWelcome();
         }
     }
     if (cdc_state_has_changed) {

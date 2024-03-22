@@ -1,98 +1,39 @@
-# midi2usbhub
-Use a Raspberry Pi Pico to interconnect MIDI devices via a USB hub or old school MIDI.
+# midi2piousbhub
+Use a Raspberry Pi Pico to interconnect a MIDI host, a serial MIDI device and
+up to 4 MIDI devices via a USB hub.
 
-This project uses a Pico board, a micro USB to USB A adapter, and a powered USB hub
-to run software that routes MIDI data among all the devices connected to the hub.
-There is a UART DIN MIDI IN and a UART DIN MIDI OUT, so you can connect
-to old school MIDI too. You can route the UART MIDI the same way your route USB MIDI.
-You configure the routing with command line interpreter (CLI) commands through
-a serial port terminal.
+This project uses the RP2040 processor's built-in USB port as a USB device
+port for connection to a USB MIDI host like a PC or Mac. It uses the RP2040's
+PIOs plus 2 GPIO pins to create a USB host port, and it uses the RP2040
+processor's built-in UART1 port for serial port MIDI.
+
+You configure how the MIDI streams connect by using serial terminal command
+line interface (CLI) connected to either the RP2040's UART0 port or the RP2040's
+built-in USB port's serial (CDC ACM) interface.
 
 The software uses some of the Pico board's program flash for a file system
 to store configurations in presets. If you save your settings to a preset, then
-the midi2usbhub software will automatically reload the last saved preset on startup
+the midi2piousbhub software will automatically reload the last saved preset on startup
 and when you plug a Connected MIDI Device to the hub. You can back up any or all of
 your presets to a USB Flash drive connected to the USB hub. Presets are stored in
-JSON format.
+JSON format. 
 
 # Project Status
-### 17-Aug-2023
-- Updated the project to use the master branch of TinyUSB and `lib/usb_midi_host` as an application USB Host driver.
-- Removed references to patching the TinyUSB library; it is no longer required.
-### 16-Dec-2022
-- Separated the CLI from the Midi2usbhub class and from the Preset_manager class.
-- Preset_manager class is no longer a singleton but instead a member of Midi2usbhub class
-### 1-Dec-2022
-- Added support for Pico-W board LED
-- Added hardware description
-- Still need to review code comments and internal documentation, clean up
-formatting, etc.
-
-### 24-Nov-2022
-- All features implemented except future features
-- Need to clean up code and documentation and fix issues.
-- Need to document the hardware.
-- I have seen an assert that happens sometimes at startup with many devices plugged
-to the hub. Need to figure that one out especially because it causes a crash.
-
-### 22-Nov-2022
-You can now save and load setups using Pico program flash storage. The last preset
-save or loaded will be remembered on startup or when a device is plugged or unplugged.
-Expanded the command set to allow for LittleFs management. Still need to implement
-backup and restore.
-
-### 20-Nov-2022
-Very early public release to help with USB MIDI host hub testing. Definitely not done.
-May crash from time to time when you plug in a new device. I have not investigated that
-yet. Not easily repeatable. UART MIDI is also implemented.
-
-## Future Features
-- Implement on a Pico-W with embedded web server support so you don't need to use
-the CLI.
 
 # Hardware
-If you already built [midi2usbhost](https://github.com/rppicomidi/midi2usbhost) hardware,
-you can use that again for this project. As of this writing, it is the same: you need
-a USB host connector, a source for 5V power, a MIDI IN port, and a MIDI OUT port. You just
-need to plug a powered USB hub to the USB host port. The only difference is that this
-project has a CLI user interface through the pins for UART1.
-
-If you build your own MIDI hardware, please test it carefully before you plug it into
-an expensive musical instrument.
-
-For this project, I am showing a more finished project. I built it with a Pico-W board because I want to eventually control it via a browser instead of, or perhap in addition
-to, the CLI. The enclosure is a [Bud CU-1941](https://www.budind.com/wp-content/uploads/2019/01/hbcu1941.pdf) with the insides smoothed out and holes
-cut for the connectors. Smoothing away the PCB card guides was a pain. I would use
-something else of similar dimensions if I were doing it over again.
-The USB breakout boards mount on M2 standoffs, and the
-main board attaches to the box with M2 screws with M2 nuts serving as standoffs.
-![](doc/midi2usbhub-inside-box.JPG). 
-
-I wired a generic USB A breakout board directly to the Pico's testpoints for GND,
-D+ and D-; the 5V VBus comes from Pico board pin 40:
-![](doc/midi2usbhub-picow.JPG)
-
-The Pico-W board plugs to hand-wired board that holds the MIDI IN, the MIDI OUT, and
-the 5V power connector. I hacked up a 5cm x 7cm board so it would fit in my project box.
-![](doc/midi2usbhub-motherboard.JPG)
-
-Bottom view:
-![](doc/midi2usbhub-bottomview.JPG)
-
-The Pico board gets 5V and GND from the VBus and GND pins of a USB C breakout board.
-I used the 3.3V MIDI IN circuit from [here](https://diyelectromusic.wordpress.com/2021/02/15/midi-in-for-3-3v-microcontrollers/) and I followed the
-[MIDI Specification](https://www.midi.org/specifications/midi-transports-specifications/5-pin-din-electrical-specs) for 3.3V MIDI OUT. I admit to cheating by using 1/4W 33 ohm
-resistor; I didn't have a 1/2W resistor on hand. Hopefully that MIDI OUT pin never gets
-shorted to ground for very long because it will fry the resistor. I substituted a Sharp
-PC900V for the MIDI IN circuit's H11L1M because it was what I had.
+I designed a custom circuit board for using this project in a Eurorack.
+TODO: Upload the design to the hardware subdirectory of this project.
 
 # Setting Up Your Build and Debug Environment
-I am running Ubuntu Linux 22.04LTS on an old PC. I have Visual Studio Code (VS Code)
+I am running Ubuntu Linux 24.04LTS on an old PC. I have Visual Studio Code (VS Code)
 installed and went
 through the tutorial in Chapter 7 or [Getting started with Raspberry Pi Pico](https://datasheets.raspberrypi.com/pico/getting-started-with-pico.pdf) to make sure it was working
 first. I use a picoprobe for debugging, so I have openocd running in a terminal window.
 I use minicom for the serial port terminal (make sure your linux account is in the dialup
-group).
+group). I found that when debugging using the picoprobe whilst also using the Pico board as
+a USB device connected to the same PC, I had to connect the picoprobe first, then
+connect the target Pico board via a USB hub. Your experience may be different.
+
 
 ## Use a TinyUSB library version that supports application host drivers
 The USB MIDI host driver is currently not part of the TinyUSB stack. It is an
@@ -121,12 +62,22 @@ git log -1
 git pull
 ```
 
+## Install PIO USB support for TinyUSB
+The latest TinyUSB does not come with PIO USB driver source code.
+To install that source, you need to have Python 3 installed on
+your computer. From a command line, type
+```
+cd ${PICO_SDK_PATH}/lib/tinyusb
+python tools/get_deps.py rp2040
+```
+For more information, see the [TinyUSB documentation](https://docs.tinyusb.org/en/latest/reference/getting_started.html#dependencies)
+
 ## Get the project code
-Clone the midiusb2hub project to a directory at the same level as the pico-sdk directory.
+Clone the midi2piousbhub project to a directory at the same level as the pico-sdk directory.
 
 ```
 cd ${PICO_SDK_PATH}/..
-git clone --recurse-submodules https://github.com/rppicomidi/midi2usbhub.git
+git clone --recurse-submodules https://github.com/rppicomidi/midi2piousbhub.git
 ```
 
 ## Command Line Build (skip if you want to use Visual Studio Code)
@@ -142,7 +93,7 @@ For all boards, enter this commands.
 
 ```
 export PICO_SDK_PATH=${PICO_MIDI_PROJECTS}/pico-sdk/
-cd ${PICO_MIDI_PROJECTS}/midi2usbhub
+cd ${PICO_MIDI_PROJECTS}/midi2piousbhub
 mkdir build
 cd build
 cmake ..

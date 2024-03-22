@@ -38,6 +38,7 @@ public:
     ~Midi2PioUsbhub_cli()=default;
     Midi2PioUsbhub_cli(Preset_manager* pm);
     void task();
+    void printWelcome();
     static uint16_t get_num_commands() { return 4; }
 private:
     /*

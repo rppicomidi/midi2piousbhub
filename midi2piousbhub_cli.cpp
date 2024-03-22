@@ -39,6 +39,7 @@ rppicomidi::Midi2PioUsbhub_cli::Midi2PioUsbhub_cli(Preset_manager* pm)
 {
     // Initialize the CLI
     EmbeddedCliConfig cli_config = {
+        .invitation = "> ",
         .rxBufferSize = 64,
         .cmdBufferSize = 64,
         .historyBufferSize = 128,
@@ -96,6 +97,17 @@ void rppicomidi::Midi2PioUsbhub_cli::task()
         embeddedCliReceiveChar(cli, c);
         embeddedCliProcess(cli);
     }
+}
+
+void rppicomidi::Midi2PioUsbhub_cli::printWelcome()
+{
+    printf("\r\n\r\n");
+    printf("Cli is running.\r\n");
+    printf("Type \"help\" for a list of commands\r\n");
+    printf("Use backspace and tab to remove chars and autocomplete\r\n");
+    printf("Use up and down arrows to recall previous commands\r\n");
+    embeddedCliReceiveChar(cli, '\r');
+    embeddedCliProcess(cli);
 }
 
 void rppicomidi::Midi2PioUsbhub_cli::static_list(EmbeddedCli *, char *, void *)

@@ -5,7 +5,7 @@ set(BOARD pico_sdk)
 # set(LOG 2)
 include(pico_sdk_import.cmake)
 
-set(target_proj midi2usbhub)
+set(target_proj midi2piousbhub)
 project(${target_proj} C CXX ASM)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
