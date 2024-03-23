@@ -347,24 +347,69 @@ void rppicomidi::Midi2PioUsbhub::flush_usb_tx()
     }
 }
 
+void rppicomidi::Midi2PioUsbhub::route_midi(Midi_out_port* out_port, const uint8_t* buffer, uint32_t bytes_read)
+{
+    if (out_port->devaddr != 0 && attached_devices[out_port->devaddr].configured)
+    {
+        if (out_port->devaddr < uart_devaddr)
+        {
+            uint32_t nwritten = tuh_midi_stream_write(out_port->devaddr, out_port->cable, buffer, bytes_read);
+            if (nwritten != bytes_read) {
+                TU_LOG1("Warning: Dropped %lu bytes sending to %s\r\n", bytes_read - nwritten, out_port->nickname.c_str());
+            }
+        }
+        else if (out_port->devaddr == uart_devaddr)
+        {
+            uint8_t npushed = midi_uart_write_tx_buffer(midi_uart_instance, buffer, bytes_read);
+            if (npushed != bytes_read)
+            {
+                TU_LOG1("Warning: Dropped %lu bytes sending to UART MIDI Out\r\n", bytes_read - npushed);
+            }
+        }
+        else
+        {
+            uint32_t nwritten = tud_midi_stream_write(0, buffer, bytes_read);
+            if (nwritten != bytes_read) {
+                TU_LOG1("Warning: Dropped %lu bytes sending to USB DEV MIDI OUT\r\n", bytes_read - nwritten);
+            }
+        }
+    }
+    else
+    {
+        TU_LOG1("skipping %s dev_addr=%u\r\n", out_port->nickname.c_str(), out_port->devaddr);
+    }
+}
+
 void rppicomidi::Midi2PioUsbhub::poll_midi_uart_rx()
 {
     uint8_t rx[48];
     // Pull any bytes received on the MIDI UART out of the receive buffer and
-    // send them out via USB MIDI on virtual cable 0
+    // send them out via USB MIDI on other connected ports
     uint8_t nread = midi_uart_poll_rx_buffer(midi_uart_instance, rx, sizeof(rx));
     if (nread > 0)
     {
         // figure out where to send data from UART MIDI IN
         for (auto &out_port : uart_midi_in_port.sends_data_to_list)
         {
-            if (out_port->devaddr != 0 && attached_devices[out_port->devaddr].configured)
+            route_midi(out_port, rx, nread);
+        }
+    }
+}
+
+void rppicomidi::Midi2PioUsbhub::poll_midi_usbdev_rx()
+{
+    if (attached_devices[usbdev_devaddr].configured)
+    {
+        uint8_t rx[48];
+        // Pull any bytes received on the USB Device MIDI out of the receive buffer and
+        // send them out via other connected ports
+        uint8_t nread = tud_midi_stream_read(rx, sizeof(rx));
+        if (nread > 0)
+        {
+            // figure out where to send data from USB Device MIDI IN
+            for (auto &out_port : usbdev_midi_in_port.sends_data_to_list)
             {
-                uint32_t nwritten = tuh_midi_stream_write(out_port->devaddr, out_port->cable, rx, nread);
-                if (nwritten != nread)
-                {
-                    TU_LOG1("Warning: Dropped %lu bytes receiving from UART MIDI In\r\n", nread - nwritten);
-                }
+                route_midi(out_port, rx, nread);
             }
         }
     }
@@ -400,14 +445,29 @@ rppicomidi::Midi2PioUsbhub::Midi2PioUsbhub() : cli{&preset_manager}
     uart_midi_out_port.cable = 0;
     uart_midi_out_port.devaddr = uart_devaddr;
     uart_midi_out_port.nickname = "MIDI-OUT-A";
+    usbdev_midi_in_port.cable = 0;
+    usbdev_midi_in_port.devaddr = usbdev_devaddr;
+    usbdev_midi_in_port.sends_data_to_list.clear();
+    usbdev_midi_in_port.nickname = "PC-MIDI-OUT"; // it's named backwards because MIDI OUT from the PC goes to the this device's USB MIDI IN
+    usbdev_midi_out_port.cable = 0;
+    usbdev_midi_out_port.devaddr = usbdev_devaddr;
+    usbdev_midi_out_port.nickname = "PC-MIDI-IN"; // it's named backwards because MIDI IN to the PC comes from this device's USB MIDI OUT
     attached_devices[uart_devaddr].vid = 0;
     attached_devices[uart_devaddr].pid = 0;
     attached_devices[uart_devaddr].product_name = "MIDI A";
     attached_devices[uart_devaddr].rx_cables = 1;
     attached_devices[uart_devaddr].tx_cables = 1;
     attached_devices[uart_devaddr].configured = true;
+    attached_devices[usbdev_devaddr].vid = 0;
+    attached_devices[usbdev_devaddr].pid = 1;
+    attached_devices[usbdev_devaddr].product_name = "PC MIDI";
+    attached_devices[usbdev_devaddr].rx_cables = 1;
+    attached_devices[usbdev_devaddr].tx_cables = 1;
+    attached_devices[usbdev_devaddr].configured = false;
     midi_in_port_list.push_back(&uart_midi_in_port);
     midi_out_port_list.push_back(&uart_midi_out_port);
+    midi_in_port_list.push_back(&usbdev_midi_in_port);
+    midi_out_port_list.push_back(&usbdev_midi_out_port);
     preset_manager.init();
     cli.printWelcome();
 }
@@ -476,8 +536,11 @@ void rppicomidi::Midi2PioUsbhub::task()
     tud_task();
 
     poll_midi_uart_rx();
+    attached_devices[usbdev_devaddr].configured = tud_midi_mounted();
+    poll_midi_usbdev_rx();
 
     midi_uart_drain_tx_buffer(midi_uart_instance);
+
 
     cli.task();
     if (cli_up_message_pending)
@@ -694,6 +757,19 @@ void rppicomidi::Midi2PioUsbhub::tuh_midi_unmount_cb(uint8_t dev_addr, uint8_t)
             ++it;
         }
     }
+
+    for (std::vector<Midi_out_port *>::iterator it = usbdev_midi_in_port.sends_data_to_list.begin(); it != usbdev_midi_in_port.sends_data_to_list.end();)
+    {
+        if ((*it)->devaddr == dev_addr)
+        {
+            usbdev_midi_in_port.sends_data_to_list.erase(it);
+        }
+        else
+        {
+            ++it;
+        }
+    }
+
     for (std::vector<Midi_out_port *>::iterator it = midi_out_port_list.begin(); it != midi_out_port_list.end();)
     {
         if ((*it)->devaddr == dev_addr)
@@ -706,7 +782,6 @@ void rppicomidi::Midi2PioUsbhub::tuh_midi_unmount_cb(uint8_t dev_addr, uint8_t)
             ++it;
         }
     }
-
     attached_devices[dev_addr].configured = false;
     attached_devices[dev_addr].product_name.clear();
     attached_devices[dev_addr].vid = 0;
@@ -738,11 +813,17 @@ void rppicomidi::Midi2PioUsbhub::tuh_midi_rx_cb(uint8_t dev_addr, uint32_t num_p
                 {
                     for (auto &out_port : in_port->sends_data_to_list)
                     {
+#if 0
                         if (out_port->devaddr != 0 && attached_devices[out_port->devaddr].configured)
                         {
-                            if (out_port->devaddr != uart_devaddr)
-                                tuh_midi_stream_write(out_port->devaddr, out_port->cable, buffer, bytes_read);
-                            else
+                            if (out_port->devaddr < uart_devaddr)
+                            {
+                                uint32_t nwritten = tuh_midi_stream_write(out_port->devaddr, out_port->cable, buffer, bytes_read);
+                                if (nwritten != bytes_read) {
+                                    TU_LOG1("Warning: Dropped %lu bytes sending to %s\r\n", bytes_read - nwritten, out_port->nickname);
+                                }
+                            }
+                            else if (out_port->devaddr == uart_devaddr)
                             {
                                 uint8_t npushed = midi_uart_write_tx_buffer(midi_uart_instance, buffer, bytes_read);
                                 if (npushed != bytes_read)
@@ -750,11 +831,20 @@ void rppicomidi::Midi2PioUsbhub::tuh_midi_rx_cb(uint8_t dev_addr, uint32_t num_p
                                     TU_LOG1("Warning: Dropped %lu bytes sending to UART MIDI Out\r\n", bytes_read - npushed);
                                 }
                             }
+                            else
+                            {
+                                uint32_t nwritten = tud_midi_stream_write(0, buffer, bytes_read);
+                                if (nwritten != bytes_read) {
+                                    TU_LOG1("Warning: Dropped %lu bytes sending to USB DEV MIDI OUT\r\n", bytes_read - nwritten);
+                                }
+                            }
                         }
                         else
                         {
                             TU_LOG1("skipping %s dev_addr=%u\r\n", out_port->nickname.c_str(), out_port->devaddr);
                         }
+#endif
+                        route_midi(out_port, buffer, bytes_read);
                     }
                     break; // found the right in_port; don't need to stay in the loop
                 }
@@ -772,13 +862,3 @@ void tuh_midi_tx_cb(uint8_t dev_addr)
 {
     (void)dev_addr;
 }
-
-#if 0
-// Install the USB MIDI Host class driver
-usbh_class_driver_t const* usbh_app_driver_get_cb(uint8_t* driver_count)
-{
-  static usbh_class_driver_t host_driver = { midih_init, midih_open, midih_set_config, midih_xfer_cb, midih_close };
-  *driver_count = 1;
-  return &host_driver;
-}
-#endif

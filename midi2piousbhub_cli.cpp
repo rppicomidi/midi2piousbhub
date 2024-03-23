@@ -114,7 +114,7 @@ void rppicomidi::Midi2PioUsbhub_cli::static_list(EmbeddedCli *, char *, void *)
 {
     printf("USB ID      Port  Direction Nickname     Product Name\n");
 
-    for (size_t addr = 1; addr <= CFG_TUH_DEVICE_MAX + 1; addr++)
+    for (size_t addr = 1; addr <= CFG_TUH_DEVICE_MAX + 2; addr++)
     {
         auto dev = Midi2PioUsbhub::instance().get_attached_device(addr);
         if (dev && dev->configured)

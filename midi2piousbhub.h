@@ -62,6 +62,7 @@ namespace rppicomidi
         void blink_led();
         void flush_usb_tx();
         void poll_midi_uart_rx();
+        void poll_midi_usbdev_rx();
         /**
          * @brief construct a nickname string from the input parameters
          * 
@@ -172,17 +173,17 @@ namespace rppicomidi
          */
         void task();
 
-        Midi_device_info* get_attached_device(size_t addr) { if (addr < 1 || addr > uart_devaddr) return nullptr; return &attached_devices[addr]; }
+        Midi_device_info* get_attached_device(size_t addr) { if (addr < 1 || addr > usbdev_devaddr) return nullptr; return &attached_devices[addr]; }
         const std::vector<Midi_out_port *>& get_midi_out_port_list() {return midi_out_port_list; }
         const std::vector<Midi_in_port *>& get_midi_in_port_list() {return midi_in_port_list; }
         void notify_cdc_state_changed() {cdc_state_has_changed = true; }
     private:
         Midi2PioUsbhub();
         Preset_manager preset_manager;
+        void route_midi(Midi_out_port* out_port, const uint8_t* buffer, uint32_t bytes_read);
 
         static void langid_cb(tuh_xfer_t *xfer);
         static void prod_str_cb(tuh_xfer_t *xfer);
-
         // UART selection Pin mapping. You can move these for your design if you want to
         // Make sure all these values are consistent with your choice of midi_uart
         static const uint MIDI_UART_NUM = 1;
@@ -195,17 +196,19 @@ namespace rppicomidi
         static const uint USBA_PWR_FLG_GPIO=19;
 
         static const uint8_t uart_devaddr = CFG_TUH_DEVICE_MAX + 1;
-
+        static const uint8_t usbdev_devaddr = CFG_TUH_DEVICE_MAX + 2;
         // Indexed by dev_addr
         // device addresses start at 1. location 0 is unused
-        // extra entry is for the UART MIDI Port
-        Midi_device_info attached_devices[CFG_TUH_DEVICE_MAX + 2];
+        // extra entries are for the UART MIDI Port and USB device port
+        Midi_device_info attached_devices[CFG_TUH_DEVICE_MAX + 3];
 
         std::vector<Midi_out_port *> midi_out_port_list;
         std::vector<Midi_in_port *> midi_in_port_list;
 
         Midi_in_port uart_midi_in_port;
         Midi_out_port uart_midi_out_port;
+        Midi_in_port usbdev_midi_in_port;
+        Midi_out_port usbdev_midi_out_port;
         Midi2PioUsbhub_cli cli;
         bool cdc_state_has_changed;
     };
