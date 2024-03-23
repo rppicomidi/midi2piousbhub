@@ -580,7 +580,6 @@ int main()
         // wait for core 1 to finish claiming PIO state machines and DMA
     while(core1_booting) {
     }
-    printf("Pico MIDI Host Example\r\n");
 #if RPPICOMIDI_PICO_W
     // The Pico W LED is attached to the CYW43 WiFi/Bluetooth module
     // Need to initialize it so the the LED blink can work
