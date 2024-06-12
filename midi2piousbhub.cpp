@@ -87,7 +87,7 @@ void core1_main()
     while (true) {
         tuh_task(); // tinyusb host task
         rppicomidi::Midi2PioUsbhub::instance().blink_led();
-        //rppicomidi::Midi2usbhub::instance().flush_usb_tx();
+        rppicomidi::Midi2PioUsbhub::instance().flush_usb_tx();
     }
 }
 
