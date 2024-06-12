@@ -21,8 +21,17 @@ JSON format.
 # Project Status
 
 # Hardware
-I designed a custom circuit board for using this project in a Eurorack.
-TODO: Upload the design to the hardware subdirectory of this project.
+My first test circuit used a Raspberry Pi Pico board, a USB A breakout board,
+and a hand wired MIDI I/O port. The circuit is the same as the hardware described
+in the [usb_midi_host README](https://github.com/rppicomidi/usb_midi_host/blob/main/README.md) 
+file except I wired a MIDI IN and MIDI OUT port to pins GP4 and GP5 like the
+[midi2usbhost](https://github.com/rppicomidi/midi2usbhost) project shows.
+
+However, it should also run on the [Adafruit Feather RP2040 with USB Type A Host](https://learn.adafruit.com/adafruit-feather-rp2040-with-usb-type-a-host/overview)
+with pins D4 and D5 wired to an
+[Adafruit MIDI FeatherWing](https://learn.adafruit.com/adafruit-midi-featherwing)
+board (take FeatherWing 3.3V power and ground from the RP2040 board), or any
+similar hardware configuration.
 
 # Setting Up Your Build and Debug Environment
 I am running Ubuntu Linux 24.04LTS on an old PC. I have Visual Studio Code (VS Code)
@@ -34,6 +43,9 @@ group). I found that when debugging using the picoprobe whilst also using the Pi
 a USB device connected to the same PC, I had to connect the picoprobe first, then
 connect the target Pico board via a USB hub. Your experience may be different.
 
+You do not need to use the picoprobe or the UART 0 output at all. The USB device
+connector on the RP2040 target board serves both as a MIDI port and serial port
+console.
 
 ## Use a TinyUSB library version that supports application host drivers
 The USB MIDI host driver is currently not part of the TinyUSB stack. It is an
@@ -192,18 +204,21 @@ with all the other info.
 Show a list of all available commands and brief help text.
 
 ## list
-List all Connected MIDI Devices currently connected to the USB hub. For example:
+List all Connected MIDI Devices currently connected to the USB hub followed
+by the built-in devices. For example:
 
 ```
 USB ID      Port  Direction Nickname    Product Name
-0000-0000    1      FROM    Drumpads    MIDI IN A
-0000-0000    1       TO     TR-707      MIDI OUT A
 0499-1622    1      FROM    lead-out    reface CS
 0499-1622    1       TO     lead        reface CS
 1C75-02CA    1      FROM    keys        Arturia Keylab Essential 88
 1C75-02CA    1       TO     keys-in     Arturia Keylab Essential 88
 1C75-02CA    2      FROM    faders      Arturia Keylab Essential 88
 1C75-02CA    2       TO     faders-in   Arturia Keylab Essential 88
+0000-0000    1      FROM    Drumpads    MIDI IN A
+0000-0000    1       TO     TR-707      MIDI OUT A
+0000-0001    1      FROM    DAW-OUT     PC MIDI                                
+0000-0001    1       TO     DAW-IN      PC MIDI     
 ```
 
 ## rename \<Old Nickname\> \<New Nickname\>
