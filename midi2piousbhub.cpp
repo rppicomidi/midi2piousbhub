@@ -322,7 +322,7 @@ void rppicomidi::Midi2PioUsbhub::blink_led()
     if (diff > 1000000)
     {
     	// Set the LED to the current led_state
-        #if 1 //#ifndef RPPICOMIDI_PICO_W
+        #ifndef RPPICOMIDI_PICO_W
         gpio_put(LED_GPIO, led_state);
         #else
         cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, led_state);

@@ -47,7 +47,9 @@ if(DEFINED PICO_BOARD)
 if(${PICO_BOARD} MATCHES "pico_w")
 message("board is pico_w")
 # add additional compile and link options
-target_compile_options(${target_proj} PRIVATE -DRPPICOMIDI_PICO_W)
+target_compile_definitions(${target_proj} PRIVATE
+  RPPICOMIDI_PICO_W
+)
 target_link_libraries(${target_proj} pico_cyw43_arch_none)
 set(RPPICOMIDI_PICO_W 1)
 else()
