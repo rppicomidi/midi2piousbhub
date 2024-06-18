@@ -1,11 +1,14 @@
 # midi2piousbhub
 Use a Raspberry Pi Pico to interconnect a MIDI host, a serial MIDI device and
-up to 4 MIDI devices via a USB hub.
+up to 4 MIDI devices via a USB hub. If you have a Pico W or compatible board,
+this project supports connection from a Bluetooth MIDI client (iPad, phone,
+PC...)
 
 This project uses the RP2040 processor's built-in USB port as a USB device
 port for connection to a USB MIDI host like a PC or Mac. It uses the RP2040's
 PIOs plus 2 GPIO pins to create a USB host port, and it uses the RP2040
-processor's built-in UART1 port for serial port MIDI.
+processor's built-in UART1 port for serial port MIDI. Bluetooth MIDI uses
+the Pico W's built-in WiFi/Bluetooth module.
 
 You configure how the MIDI streams connect by using serial terminal command
 line interface (CLI) connected to either the RP2040's UART0 port or the RP2040's
@@ -23,8 +26,9 @@ JSON format.
 # Hardware
 My first test circuit used a Raspberry Pi Pico board, a USB A breakout board,
 and a hand wired MIDI I/O port. The circuit is the same as the hardware described
-in the [usb_midi_host README](https://github.com/rppicomidi/usb_midi_host/blob/main/README.md) 
-file except I wired a MIDI IN and MIDI OUT port to pins GP4 and GP5 like the
+in the [usb_midi_host README](https://github.com/rppicomidi/usb_midi_host/blob/main/README.md)
+ "Software-based USB Host Port: Pico_PIO_USB Library" section
+except I wired a MIDI IN and MIDI OUT port to pins GP4 and GP5 like the
 [midi2usbhost](https://github.com/rppicomidi/midi2usbhost) project shows.
 
 However, it should also run on the [Adafruit Feather RP2040 with USB Type A Host](https://learn.adafruit.com/adafruit-feather-rp2040-with-usb-type-a-host/overview)
@@ -47,6 +51,24 @@ You do not need to use the picoprobe or the UART 0 output at all. The USB device
 connector on the RP2040 target board serves both as a MIDI port and serial port
 console.
 
+## Install the Pico C/C++ SDK
+If you have not already done so, follow the instructions for installing the Raspberry Pi Pico SDK in Chapter 2 of the 
+[Getting started with Raspberry Pi Pico](https://datasheets.raspberrypi.com/pico/getting-started-with-pico.pdf)
+document. In particular, make sure `PICO_SDK_PATH` is set to the directory where you installed the pico-sdk.
+
+## Pico W Users: Update the Pico SDK
+At the time of this writing, the Pico C/C++ SDK version is 1.5.1. It has some
+issues with Bluetooth Support that are fixed in the `develop` branch of the pico-sdk.
+To address these issues, please check out the `develop` branch of the pico-sdk and
+get the latest version.
+```
+cd ${PICO_SDK_PATH}
+git checkout -b develop origin/develop
+git pull
+git submodule update -- lib/btstack
+git submodule update -- lib/cyw43-driver
+```
+
 ## Use a TinyUSB library version that supports application host drivers
 The USB MIDI host driver is currently not part of the TinyUSB stack. It is an
 application host driver found in this project's `lib/usb_midi_host` directory.
@@ -57,19 +79,16 @@ of the TinyUSB library for this code to work correctly. The following describes
 how to make sure your Pico SDK version's TinyUSB library supports application host
 drivers.
 
-1. If you have not already done so, follow the instructions for installing the Raspberry Pi Pico SDK in Chapter 2 of the 
-[Getting started with Raspberry Pi Pico](https://datasheets.raspberrypi.com/pico/getting-started-with-pico.pdf)
-document. In particular, make sure `PICO_SDK_PATH` is set to the directory where you installed the pico-sdk.
-2. Set the working directory to the tinyusb library and make sure you are on the main branch.
+1. Set the working directory to the tinyusb library and make sure you are on the main branch.
 ```
 cd ${PICO_SDK_PATH}/lib/tinyusb
 git checkout master
 ```
-3. Check the date on the last commit to the TinyUSB library master branch.
+2. Check the date on the last commit to the TinyUSB library master branch.
 ```
 git log -1
 ```
-4. If the `Date:` is >= 15-Aug-2023, your TinyUSB library should be fine. If not, get the latest
+3. If the `Date:` is >= 15-Aug-2023, your TinyUSB library should be fine. If not, get the latest
 ```
 git pull
 ```
@@ -217,8 +236,10 @@ USB ID      Port  Direction Nickname    Product Name
 1C75-02CA    2       TO     faders-in   Arturia Keylab Essential 88
 0000-0000    1      FROM    Drumpads    MIDI IN A
 0000-0000    1       TO     TR-707      MIDI OUT A
-0000-0001    1      FROM    DAW-OUT     PC MIDI                                
-0000-0001    1       TO     DAW-IN      PC MIDI     
+0000-0001    1      FROM    DAW-OUT     PC MIDI
+0000-0001    1       TO     DAW-IN      PC MIDI
+0000-0002    1      FROM    iPad-OUT    BT MIDI
+0000-0002    1       TO     iPad-IN     BT MIDI
 ```
 
 ## rename \<Old Nickname\> \<New Nickname\>
