@@ -33,12 +33,14 @@
 #ifndef RING_BUFFER_LIB_CONFIG
 #define RING_BUFFER_LIB_CONFIG
 
+#include <stdint.h>
+
 // You can define a larger ring buffer size type if you want
 // RING_BUFFER_SIZE_TYPE has to be able to hold a value less
 // than or equal to the maximum number of bytes in a ring buffer
 // Uncomment and modify the next line if the default (uint8_t)
 // is not big enough
-// #define RING_BUFFER_SIZE_TYPE uint8_t
+#define RING_BUFFER_SIZE_TYPE uint16_t
 
 // If you don't need to support multiple cores modifying the
 // ring buffer, set RING_BUFFER_MULTICORE_SUPPORT to 0; it

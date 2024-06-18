@@ -18,6 +18,7 @@ add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/lib/midi_uart_lib)
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/lib/rp2040_rtc)
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/lib/usb_midi_host)
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/lib/cdc_stdio_lib)
+
 set(EMBEDDED_CLI_PATH ${CMAKE_CURRENT_LIST_DIR}/ext_lib/embedded-cli/lib/)
 add_executable(${target_proj}
     midi2piousbhub.cpp
@@ -46,12 +47,25 @@ littlefs-lib msc_fatfs rp2040_rtc pico_multicore tinyusb_pico_pio_usb cdc_stdio_
 if(DEFINED PICO_BOARD)
 if(${PICO_BOARD} MATCHES "pico_w")
 message("board is pico_w")
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/lib/pico-w-ble-midi-lib)
+
 # add additional compile and link options
 target_compile_definitions(${target_proj} PRIVATE
   RPPICOMIDI_PICO_W
 )
-target_link_libraries(${target_proj} pico_cyw43_arch_none)
+target_include_directories(${target_proj} PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR} # For btstack config, etc.
+    )
+target_link_libraries(${target_proj}
+  pico_cyw43_arch_none
+  ble_midi_service_lib
+  pico_btstack_cyw43
+)
+target_sources(${target_proj} PRIVATE
+  ble_midi_manager.cpp
+)
 set(RPPICOMIDI_PICO_W 1)
+pico_btstack_make_gatt_header(${target_proj} PRIVATE "${CMAKE_CURRENT_LIST_DIR}/ble_midi_profile.gatt" "${CMAKE_CURRENT_LIST_DIR}/lib/pico-w-ble-midi-lib")
 else()
 message("board is pico")
 endif()

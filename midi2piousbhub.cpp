@@ -26,6 +26,46 @@
  * SOFTWARE.
  *
  */
+
+/**
+ * This file uses code from various BlueKitchen example files, which contain
+ * the following copyright notice, included per the notice below.
+ *
+ * Copyright (C) 2018 BlueKitchen GmbH
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the copyright holders nor the names of
+ *    contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
+ * 4. Any redistribution, use, or modification is done solely for
+ *    personal benefit and not for any commercial purpose or for
+ *    monetary gain.
+ *
+ * THIS SOFTWARE IS PROVIDED BY BLUEKITCHEN GMBH AND CONTRIBUTORS
+ * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL BLUEKITCHEN
+ * GMBH OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
+ * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * Please inquire about commercial licensing options at 
+ * contact@bluekitchen-gmbh.com
+ *
+ */
 #ifdef NDEBUG
 // Need to do this here for release builds or no CLI commands will be added
 // All build variants except DEBUG define NDEBUG, which makes assert() macro generate
@@ -46,9 +86,6 @@
 #include "bsp/board_api.h"
 #include "preset_manager.h"
 #include "diskio.h"
-#ifdef RPPICOMIDI_PICO_W
-#include "pico/cyw43_arch.h"
-#endif
 
 // Because the PIO USB code runs in core 1
 // and USB MIDI OUT sends are triggered on core 0,
@@ -363,14 +400,21 @@ void rppicomidi::Midi2PioUsbhub::route_midi(Midi_out_port* out_port, const uint8
             uint8_t npushed = midi_uart_write_tx_buffer(midi_uart_instance, buffer, bytes_read);
             if (npushed != bytes_read)
             {
-                TU_LOG1("Warning: Dropped %lu bytes sending to UART MIDI Out\r\n", bytes_read - npushed);
+                TU_LOG1("Warning: Dropped %lu bytes sending to UART MIDI OUT\r\n", bytes_read - npushed);
+            }
+        }
+        else if (out_port->devaddr == usbdev_devaddr)
+        {
+            uint32_t nwritten = tud_midi_stream_write(0, buffer, bytes_read);
+            if (nwritten != bytes_read) {
+                TU_LOG1("Warning: Dropped %lu bytes sending to USB DEV MIDI IN of host\r\n", bytes_read - nwritten);
             }
         }
         else
         {
-            uint32_t nwritten = tud_midi_stream_write(0, buffer, bytes_read);
+            uint8_t nwritten = blem.stream_write(buffer, bytes_read);
             if (nwritten != bytes_read) {
-                TU_LOG1("Warning: Dropped %lu bytes sending to USB DEV MIDI OUT\r\n", bytes_read - nwritten);
+                TU_LOG1("Warning: Dropped %lu bytes sending to BT MIDI IN of remote client\r\n", bytes_read - nwritten);
             }
         }
     }
@@ -415,7 +459,25 @@ void rppicomidi::Midi2PioUsbhub::poll_midi_usbdev_rx()
     }
 }
 
+void rppicomidi::Midi2PioUsbhub::poll_ble_rx()
+{
+    if (blem.is_connected()) {
+        uint8_t rx[3];
+        uint8_t nread = blem.stream_read(rx, sizeof(rx));
+        if (nread > 0)
+        {
+            for (auto &out_port: ble_midi_in_port.sends_data_to_list)
+            {
+                route_midi(out_port, rx, nread);
+            }
+        }
+    }
+}
+
 rppicomidi::Midi2PioUsbhub::Midi2PioUsbhub() : cli{&preset_manager}
+#ifdef RPPICOMIDI_PICO_W
+    ,blem{"midi-hub", 8}
+#endif
 {
     bi_decl(bi_program_description("Provide a USB host interface for Serial Port MIDI."));
     bi_decl(bi_1pin_with_name(LED_GPIO, "On-board LED"));
@@ -448,10 +510,16 @@ rppicomidi::Midi2PioUsbhub::Midi2PioUsbhub() : cli{&preset_manager}
     usbdev_midi_in_port.cable = 0;
     usbdev_midi_in_port.devaddr = usbdev_devaddr;
     usbdev_midi_in_port.sends_data_to_list.clear();
-    usbdev_midi_in_port.nickname = "PC-MIDI-OUT"; // it's named backwards because MIDI OUT from the PC goes to the this device's USB MIDI IN
+    usbdev_midi_in_port.nickname = "PC-MIDI-OUT"; // it's named backwards because MIDI OUT from the PC goes to this device's USB MIDI IN
     usbdev_midi_out_port.cable = 0;
     usbdev_midi_out_port.devaddr = usbdev_devaddr;
     usbdev_midi_out_port.nickname = "PC-MIDI-IN"; // it's named backwards because MIDI IN to the PC comes from this device's USB MIDI OUT
+    ble_midi_in_port.cable = 0;
+    ble_midi_in_port.devaddr = ble_devaddr;
+    ble_midi_in_port.nickname = "BT-MIDI-OUT"; // it's named backwards because MIDI OUT from the BT Client (PC, iPad, etc.) goes to this device's MIDI IN
+    ble_midi_out_port.cable = 0;
+    ble_midi_out_port.devaddr = ble_devaddr;
+    ble_midi_out_port.nickname = "BT-MIDI-IN";  // it's named backwards because MIDI IN from the BT Client (PC, iPad, etc.) comes from this device's MIDI OUT
     attached_devices[uart_devaddr].vid = 0;
     attached_devices[uart_devaddr].pid = 0;
     attached_devices[uart_devaddr].product_name = "MIDI A";
@@ -464,12 +532,26 @@ rppicomidi::Midi2PioUsbhub::Midi2PioUsbhub() : cli{&preset_manager}
     attached_devices[usbdev_devaddr].rx_cables = 1;
     attached_devices[usbdev_devaddr].tx_cables = 1;
     attached_devices[usbdev_devaddr].configured = false;
+    attached_devices[ble_devaddr].vid = 0;
+    attached_devices[ble_devaddr].pid = 2;
+    attached_devices[ble_devaddr].product_name = "BT MIDI";
+    attached_devices[ble_devaddr].rx_cables = 1;
+    attached_devices[ble_devaddr].tx_cables = 1;
+    attached_devices[ble_devaddr].configured = false;
     midi_in_port_list.push_back(&uart_midi_in_port);
     midi_out_port_list.push_back(&uart_midi_out_port);
     midi_in_port_list.push_back(&usbdev_midi_in_port);
     midi_out_port_list.push_back(&usbdev_midi_out_port);
+    midi_in_port_list.push_back(&ble_midi_in_port);
+    midi_out_port_list.push_back(&ble_midi_out_port);
     preset_manager.init();
     cli.printWelcome();
+#if RPPICOMIDI_PICO_W
+    // The Pico W LED is attached to the CYW43 WiFi/Bluetooth module
+    // Need to initialize it so the the LED blink can work
+    blem.init(&blem);
+#endif
+
 }
 
 #if 0
@@ -537,7 +619,9 @@ void rppicomidi::Midi2PioUsbhub::task()
 
     poll_midi_uart_rx();
     attached_devices[usbdev_devaddr].configured = tud_midi_mounted();
+    attached_devices[ble_devaddr].configured = blem.is_connected();
     poll_midi_usbdev_rx();
+    poll_ble_rx();
 
     midi_uart_drain_tx_buffer(midi_uart_instance);
 
@@ -580,14 +664,6 @@ int main()
         // wait for core 1 to finish claiming PIO state machines and DMA
     while(core1_booting) {
     }
-#if RPPICOMIDI_PICO_W
-    // The Pico W LED is attached to the CYW43 WiFi/Bluetooth module
-    // Need to initialize it so the the LED blink can work
-    if (cyw43_arch_init()) {
-        printf("WiFi init failed");
-        return -1;
-    }
-#endif
     rppicomidi::Midi2PioUsbhub &instance = rppicomidi::Midi2PioUsbhub::instance();
     core0_booting = false;
     while (1) {

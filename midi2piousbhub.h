@@ -39,6 +39,9 @@
 #include "parson.h"
 #include "preset_manager.h"
 #include "midi2piousbhub_cli.h"
+#ifdef RPPICOMIDI_PICO_W
+#include "ble_midi_manager.h"
+#endif
 namespace rppicomidi
 {
     class Midi2PioUsbhub
@@ -63,6 +66,7 @@ namespace rppicomidi
         void flush_usb_tx();
         void poll_midi_uart_rx();
         void poll_midi_usbdev_rx();
+        void poll_ble_rx();
         /**
          * @brief construct a nickname string from the input parameters
          * 
@@ -173,7 +177,8 @@ namespace rppicomidi
          */
         void task();
 
-        Midi_device_info* get_attached_device(size_t addr) { if (addr < 1 || addr > usbdev_devaddr) return nullptr; return &attached_devices[addr]; }
+        Midi_device_info* get_attached_device(size_t addr) { if (addr < 1 || addr > ble_devaddr) return nullptr; return &attached_devices[addr]; }
+        bool is_device_configured(size_t addr) { Midi_device_info* dev = get_attached_device(addr); if (dev) return dev->configured; return false; }
         const std::vector<Midi_out_port *>& get_midi_out_port_list() {return midi_out_port_list; }
         const std::vector<Midi_in_port *>& get_midi_in_port_list() {return midi_in_port_list; }
         void notify_cdc_state_changed() {cdc_state_has_changed = true; }
@@ -197,10 +202,11 @@ namespace rppicomidi
 
         static const uint8_t uart_devaddr = CFG_TUH_DEVICE_MAX + 1;
         static const uint8_t usbdev_devaddr = CFG_TUH_DEVICE_MAX + 2;
+        static const uint8_t ble_devaddr = CFG_TUH_DEVICE_MAX + 3;
         // Indexed by dev_addr
         // device addresses start at 1. location 0 is unused
-        // extra entries are for the UART MIDI Port and USB device port
-        Midi_device_info attached_devices[CFG_TUH_DEVICE_MAX + 3];
+        // extra entries are for the UART MIDI Port and USB device port and the BLE server port
+        Midi_device_info attached_devices[CFG_TUH_DEVICE_MAX + 4];
 
         std::vector<Midi_out_port *> midi_out_port_list;
         std::vector<Midi_in_port *> midi_in_port_list;
@@ -209,7 +215,12 @@ namespace rppicomidi
         Midi_out_port uart_midi_out_port;
         Midi_in_port usbdev_midi_in_port;
         Midi_out_port usbdev_midi_out_port;
+        Midi_in_port ble_midi_in_port;
+        Midi_out_port ble_midi_out_port;
         Midi2PioUsbhub_cli cli;
         bool cdc_state_has_changed;
+        #if RPPICOMIDI_PICO_W
+        BLE_MIDI_Manager blem;
+        #endif
     };
 }
