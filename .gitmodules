@@ -19,3 +19,6 @@
 [submodule "lib/cdc_stdio_lib"]
 	path = lib/cdc_stdio_lib
 	url = https://github.com/rppicomidi/cdc_stdio_lib.git
+[submodule "lib/pico-w-ble-midi-lib"]
+	path = lib/pico-w-ble-midi-lib
+	url = https://github.com/rppicomidi/pico-w-ble-midi-lib.git
