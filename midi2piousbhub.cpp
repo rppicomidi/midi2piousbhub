@@ -410,6 +410,7 @@ void rppicomidi::Midi2PioUsbhub::route_midi(Midi_out_port* out_port, const uint8
                 TU_LOG1("Warning: Dropped %lu bytes sending to USB DEV MIDI IN of host\r\n", bytes_read - nwritten);
             }
         }
+#ifdef RPPICOMIDI_PICO_W
         else
         {
             uint8_t nwritten = blem.stream_write(buffer, bytes_read);
@@ -417,6 +418,7 @@ void rppicomidi::Midi2PioUsbhub::route_midi(Midi_out_port* out_port, const uint8
                 TU_LOG1("Warning: Dropped %lu bytes sending to BT MIDI IN of remote client\r\n", bytes_read - nwritten);
             }
         }
+#endif
     }
     else
     {
@@ -459,6 +461,7 @@ void rppicomidi::Midi2PioUsbhub::poll_midi_usbdev_rx()
     }
 }
 
+#ifdef RPPICOMIDI_PICO_W
 void rppicomidi::Midi2PioUsbhub::poll_ble_rx()
 {
     if (blem.is_connected()) {
@@ -473,6 +476,7 @@ void rppicomidi::Midi2PioUsbhub::poll_ble_rx()
         }
     }
 }
+#endif
 
 #ifdef RPPICOMIDI_PICO_W
 rppicomidi::Midi2PioUsbhub::Midi2PioUsbhub() : blem{"midi-hub", 8}, cli{&preset_manager, &blem}
@@ -619,9 +623,13 @@ void rppicomidi::Midi2PioUsbhub::task()
 
     poll_midi_uart_rx();
     attached_devices[usbdev_devaddr].configured = tud_midi_mounted();
+#ifdef RPPICOMIDI_PICO_W
     attached_devices[ble_devaddr].configured = blem.is_connected();
+#endif
     poll_midi_usbdev_rx();
+#ifdef RPPICOMIDI_PICO_W
     poll_ble_rx();
+#endif
 
     midi_uart_drain_tx_buffer(midi_uart_instance);
 

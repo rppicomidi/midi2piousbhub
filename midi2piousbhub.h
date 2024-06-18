@@ -66,7 +66,9 @@ namespace rppicomidi
         void flush_usb_tx();
         void poll_midi_uart_rx();
         void poll_midi_usbdev_rx();
+#ifdef RPPICOMIDI_PICO_W
         void poll_ble_rx();
+#endif
         /**
          * @brief construct a nickname string from the input parameters
          * 

@@ -42,7 +42,7 @@ rppicomidi::Midi2PioUsbhub_cli::Midi2PioUsbhub_cli(Preset_manager* pm, BLE_MIDI_
 #else
 rppicomidi::Midi2PioUsbhub_cli::Midi2PioUsbhub_cli(Preset_manager* pm)
 {
-    uint32_t base_commands = Midi2PioUsbhub_cli::get_num_commands()
+    uint32_t base_commands = Midi2PioUsbhub_cli::get_num_commands();
 #endif
     // Initialize the CLI
     EmbeddedCliConfig cli_config = {
