@@ -217,10 +217,10 @@ namespace rppicomidi
         Midi_out_port usbdev_midi_out_port;
         Midi_in_port ble_midi_in_port;
         Midi_out_port ble_midi_out_port;
-        Midi2PioUsbhub_cli cli;
-        bool cdc_state_has_changed;
         #if RPPICOMIDI_PICO_W
         BLE_MIDI_Manager blem;
         #endif
+        Midi2PioUsbhub_cli cli;
+        bool cdc_state_has_changed;
     };
 }

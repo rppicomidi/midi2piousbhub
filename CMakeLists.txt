@@ -63,6 +63,7 @@ target_link_libraries(${target_proj}
 )
 target_sources(${target_proj} PRIVATE
   ble_midi_manager.cpp
+  ble_midi_manager_cli.cpp
 )
 set(RPPICOMIDI_PICO_W 1)
 pico_btstack_make_gatt_header(${target_proj} PRIVATE "${CMAKE_CURRENT_LIST_DIR}/ble_midi_profile.gatt" "${CMAKE_CURRENT_LIST_DIR}/lib/pico-w-ble-midi-lib")

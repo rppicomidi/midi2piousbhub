@@ -474,9 +474,10 @@ void rppicomidi::Midi2PioUsbhub::poll_ble_rx()
     }
 }
 
-rppicomidi::Midi2PioUsbhub::Midi2PioUsbhub() : cli{&preset_manager}
 #ifdef RPPICOMIDI_PICO_W
-    ,blem{"midi-hub", 8}
+rppicomidi::Midi2PioUsbhub::Midi2PioUsbhub() : blem{"midi-hub", 8}, cli{&preset_manager, &blem}
+#else
+rppicomidi::Midi2PioUsbhub::Midi2PioUsbhub() : cli{&preset_manager}
 #endif
 {
     bi_decl(bi_program_description("Provide a USB host interface for Serial Port MIDI."));
@@ -545,13 +546,12 @@ rppicomidi::Midi2PioUsbhub::Midi2PioUsbhub() : cli{&preset_manager}
     midi_in_port_list.push_back(&ble_midi_in_port);
     midi_out_port_list.push_back(&ble_midi_out_port);
     preset_manager.init();
-    cli.printWelcome();
 #if RPPICOMIDI_PICO_W
     // The Pico W LED is attached to the CYW43 WiFi/Bluetooth module
     // Need to initialize it so the the LED blink can work
     blem.init(&blem);
 #endif
-
+    cli.printWelcome();
 }
 
 #if 0

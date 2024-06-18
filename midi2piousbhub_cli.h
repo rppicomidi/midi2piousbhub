@@ -27,6 +27,9 @@
 #include "embedded_cli.h"
 #include "preset_manager.h"
 #include "tusb.h"
+#ifdef RPPICOMIDI_PICO_W
+#include "ble_midi_manager_cli.h"
+#endif
 namespace rppicomidi
 {
 class Midi2PioUsbhub_cli
@@ -36,10 +39,14 @@ public:
     Midi2PioUsbhub_cli(Midi2PioUsbhub_cli const&) = delete;
     void operator=(Midi2PioUsbhub_cli const&) = delete;
     ~Midi2PioUsbhub_cli()=default;
+#ifdef RPPICOMIDI_PICO_W
+    Midi2PioUsbhub_cli(Preset_manager* pm, BLE_MIDI_Manager* blem);
+#else
     Midi2PioUsbhub_cli(Preset_manager* pm);
+#endif
     void task();
     void printWelcome();
-    static uint16_t get_num_commands() { return 4; }
+    static uint16_t get_num_commands() { return 6; }
 private:
     /*
      * The following 3 functions are required by the EmbeddedCli library

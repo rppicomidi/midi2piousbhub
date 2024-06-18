@@ -126,6 +126,12 @@ public:
      * @return the number of bytes actually written. Will be 0 if not connected
      */
     uint8_t stream_write(const uint8_t* bytes, uint8_t num_bytes);
+
+    /**
+     * @brief Force the Bluetooth connection to disconnect
+     * 
+     */
+    void disconnect();
 private:
     void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size);
     static void static_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size);

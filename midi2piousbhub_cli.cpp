@@ -35,15 +35,22 @@
 #include "pico_fatfs_cli.h"
 #include "preset_manager_cli.h"
 #include "midi2piousbhub.h"
+#ifdef RPPICOMIDI_PICO_W
+rppicomidi::Midi2PioUsbhub_cli::Midi2PioUsbhub_cli(Preset_manager* pm, BLE_MIDI_Manager* blem)
+{
+    uint32_t base_commands = Midi2PioUsbhub_cli::get_num_commands() + BLE_MIDI_Manager_cli::get_num_commands();
+#else
 rppicomidi::Midi2PioUsbhub_cli::Midi2PioUsbhub_cli(Preset_manager* pm)
 {
+    uint32_t base_commands = Midi2PioUsbhub_cli::get_num_commands()
+#endif
     // Initialize the CLI
     EmbeddedCliConfig cli_config = {
         .invitation = "> ",
         .rxBufferSize = 64,
         .cmdBufferSize = 64,
         .historyBufferSize = 128,
-        .maxBindingCount = static_cast<uint16_t>(6 +
+        .maxBindingCount = static_cast<uint16_t>(base_commands +
                             Preset_manager_cli::get_num_commands() +
                             Pico_lfs_cli::get_num_commands() +
                             Pico_fatfs_cli::get_num_commands()),
@@ -87,6 +94,9 @@ rppicomidi::Midi2PioUsbhub_cli::Midi2PioUsbhub_cli(Preset_manager* pm)
     Preset_manager_cli pm_cli(cli, pm);
     Pico_lfs_cli lfs_cli(cli);
     Pico_fatfs_cli fatfs_cli(cli);
+#ifdef RPPICOMIDI_PICO_W
+    BLE_MIDI_Manager_cli blem_cli(cli, blem);
+#endif
 }
 
 void rppicomidi::Midi2PioUsbhub_cli::task()

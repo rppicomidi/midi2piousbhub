@@ -341,3 +341,6 @@ Print the current date and time as read from the on-chip real-time clock. The ti
 has a resolution of 2 seconds as because that is what is required for flash drive
 file timestamps. The initial date and time will be the last time you built the
 msc-rp2040rtc library.
+
+## btmidi-disconnect
+Disconnect an active Bluetooth MIDI connection or report "Already disconnected."

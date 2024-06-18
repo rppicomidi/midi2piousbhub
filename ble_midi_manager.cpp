@@ -125,6 +125,7 @@ void rppicomidi::BLE_MIDI_Manager::packet_handler(uint8_t packet_type, uint16_t 
                     break;
                 case HCI_EVENT_DISCONNECTION_COMPLETE:
                     printf("ble-midi2usbhost: HCI_EVENT_DISCONNECTION_COMPLETE event\r\n");
+                    con_handle = HCI_CON_HANDLE_INVALID;
                     break;
                 case HCI_EVENT_GATTSERVICE_META:
                     switch(hci_event_gattservice_meta_get_subevent_code(packet)) {
@@ -289,4 +290,9 @@ uint8_t rppicomidi::BLE_MIDI_Manager::stream_write(const uint8_t* bytes, uint8_t
     return 0;
 }
 
+void rppicomidi::BLE_MIDI_Manager::disconnect()
+{
+    if (is_connected())
+        gap_disconnect(con_handle);
+}
 #endif
