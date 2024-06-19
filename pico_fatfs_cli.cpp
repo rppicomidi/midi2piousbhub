@@ -22,12 +22,6 @@
  * SOFTWARE.
  * 
  */
-#ifdef NDEBUG
-// Need to do this here for release builds or no CLI commands will be added
-// All build variants except DEBUG define NDEBUG, which makes assert() macro generate
-// no code at all, which prevents msc_demo_cli_init() from adding any CLI commands.
-#undef NDEBUG
-#endif
 #include "pico_fatfs_cli.h"
 #include "diskio.h"
 #include "rp2040_rtc.h"
@@ -35,55 +29,63 @@
 
 rppicomidi::Pico_fatfs_cli::Pico_fatfs_cli(EmbeddedCli* cli)
 {
-    assert(embeddedCliAddBinding(cli, {
+    volatile bool result = embeddedCliAddBinding(cli, {
         "f-cd",
         "change current directory on the USB flash drive. usage: f-cd <path>",
         true,
         this,
         static_fatfs_cd
-    }));
-    assert(embeddedCliAddBinding(cli, {
+    });
+    assert(result);
+    result = embeddedCliAddBinding(cli, {
         "f-chdrive",
         "change current drive number for the USB flash drive. usage: f-chdrive <drive number 0-3>",
         true,
         this,
         static_fatfs_chdrive
-    }));
-    assert(embeddedCliAddBinding(cli, {
+    });
+    assert(result);
+    result = embeddedCliAddBinding(cli, {
         "f-ls",
         "list contents of the current directory on the current USB flash drive. usage: f-ls [path]",
         false,
         this,
         static_fatfs_ls
-    }));
-    assert(embeddedCliAddBinding(cli, {
+    });
+    assert(result);
+    result = embeddedCliAddBinding(cli, {
         "f-pwd",
         "print the current directory path of the current USB flash drive. usage: f-pwd",
         false,
         this,
         static_fatfs_pwd
-    }));
-    assert(embeddedCliAddBinding(cli, {
+    });
+    assert(result);
+    result = embeddedCliAddBinding(cli, {
             "set-date",
             "change the date for file timestamps; usage set-date year(2022-9999) month(1-12) day(1-31)",
             true,
             NULL,
             static_set_date
-    }));
-    assert(embeddedCliAddBinding(cli, {
+    });
+    assert(result);
+    result = embeddedCliAddBinding(cli, {
             "set-time",
             "change the time of day for file timestamps; usage set-time hour(0-23) minute(0-59) second(0-59)",
             true,
             NULL,
             static_set_time
-    }));
-    assert(embeddedCliAddBinding(cli, {
+    });
+    assert(result);
+    result = embeddedCliAddBinding(cli, {
             "get-datetime",
             "print the current date and time",
             false,
             NULL,
             static_get_fat_time
-    }));
+    });
+    assert(result);
+    (void)result;
 }
 
 

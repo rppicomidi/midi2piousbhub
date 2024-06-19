@@ -22,13 +22,6 @@
  * SOFTWARE.
  * 
  */
-#ifdef NDEBUG
-// Need to do this here for release builds or no CLI commands will be added
-// All build variants except DEBUG define NDEBUG, which makes assert() macro generate
-// no code at all, which prevents msc_demo_cli_init() from adding any CLI commands.
-#undef NDEBUG
-#endif
-
 #include "midi2piousbhub_cli.h"
 #include "pico/stdlib.h"
 #include "pico_lfs_cli.h"
@@ -61,36 +54,43 @@ rppicomidi::Midi2PioUsbhub_cli::Midi2PioUsbhub_cli(Preset_manager* pm)
     cli = embeddedCliNew(&cli_config);
     cli->onCommand = onCommandFn;
     cli->writeChar = writeCharFn;
-    assert(embeddedCliAddBinding(cli, {"connect",
+    volatile bool result = embeddedCliAddBinding(cli, {"connect",
                                        "Route MIDI streams. usage: connect <FROM nickname> <TO nickname>",
                                        true,
                                        this,
-                                       static_connect}));
-    assert(embeddedCliAddBinding(cli, {"disconnect",
+                                       static_connect});
+    assert(result);
+    result = embeddedCliAddBinding(cli, {"disconnect",
                                        "Break MIDI stream route. usage: disconnect <FROM nickname> <TO nickname>",
                                        true,
                                        this,
-                                       static_disconnect}));
-    assert(embeddedCliAddBinding(cli, {"list",
+                                       static_disconnect});
+    assert(result);
+    result = embeddedCliAddBinding(cli, {"list",
                                        "List all connected MIDI Devices: usage: list",
                                        false,
                                        this,
-                                       static_list}));
-    assert(embeddedCliAddBinding(cli, {"rename",
+                                       static_list});
+    assert(result);
+    result = embeddedCliAddBinding(cli, {"rename",
                                        "Change a nickname. usage: rename <Old Nickname> <New Nickname>",
                                        true,
                                        this,
-                                       static_rename}));
-    assert(embeddedCliAddBinding(cli, {"reset",
+                                       static_rename});
+    assert(result);
+    result = embeddedCliAddBinding(cli, {"reset",
                                        "Disconnect all routes. usage reset",
                                        false,
                                        this,
-                                       static_reset}));
-    assert(embeddedCliAddBinding(cli, {"show",
+                                       static_reset});
+    assert(result);
+    result = embeddedCliAddBinding(cli, {"show",
                                        "Show the connection matrix. usage show",
                                        false,
                                        this,
-                                       static_show}));
+                                       static_show});
+    assert(result);
+    (void)result;
     Preset_manager_cli pm_cli(cli, pm);
     Pico_lfs_cli lfs_cli(cli);
     Pico_fatfs_cli fatfs_cli(cli);

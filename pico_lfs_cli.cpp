@@ -26,42 +26,48 @@
 #include "pico_hal.h"
 rppicomidi::Pico_lfs_cli::Pico_lfs_cli(EmbeddedCli* cli_) : cli{cli_}
 {
-    assert(embeddedCliAddBinding(cli, {
+    volatile bool result;
+    result = embeddedCliAddBinding(cli, {
         "cat",
         "print file contents. usage: cat <fn>",
         true,
         this,
         static_print_file
-    }));
-    assert(embeddedCliAddBinding(cli, {
+    });
+    assert(result);
+    result = embeddedCliAddBinding(cli, {
         "format",
         "format settings file system",
         false,
         this,
         static_file_system_format
-    }));
-    assert(embeddedCliAddBinding(cli, {
+    });
+    assert(result);
+    result = embeddedCliAddBinding(cli, {
         "fsstat",
         "display settings file system status",
         false,
         this,
         static_file_system_status
-    }));
-    assert(embeddedCliAddBinding(cli, {
+    });
+    assert(result);
+    result = embeddedCliAddBinding(cli, {
         "ls",
         "list all settings files",
         true,
         this,
         static_list_files
-    }));
-    assert(embeddedCliAddBinding(cli, {
+    });
+    assert(result);
+    result = embeddedCliAddBinding(cli, {
         "rm",
         "delete. usage: rm <fn>",
         true,
         this,
         static_delete_file
-    }));
-
+    });
+    assert(result);
+    (void)result;
 }
 
 int rppicomidi::Pico_lfs_cli::lfs_ls(const char *path)

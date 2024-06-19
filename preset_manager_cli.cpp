@@ -22,46 +22,44 @@
  * SOFTWARE.
  * 
  */
-#ifdef NDEBUG
-// Need to do this here for release builds or no CLI commands will be added
-// All build variants except DEBUG define NDEBUG, which makes assert() macro generate
-// no code at all, which prevents msc_demo_cli_init() from adding any CLI commands.
-#undef NDEBUG
-#endif
-
 #include "preset_manager_cli.h"
 #include <string>
 
 rppicomidi::Preset_manager_cli::Preset_manager_cli(EmbeddedCli* cli, Preset_manager* pm)
 {
-    assert(embeddedCliAddBinding(cli, {
+    volatile bool result = embeddedCliAddBinding(cli, {
         "load",
         "load the current preset from the preset file name. usage: load <preset name>",
         true,
         pm,
         static_load_preset
-    }));
-    assert(embeddedCliAddBinding(cli, {
+    });
+    assert(result);
+    embeddedCliAddBinding(cli, {
         "save",
         "save the current configuration as a preset. usage: save <preset name>",
         true,
         pm,
         static_save_current_preset
-    }));
-    assert(embeddedCliAddBinding(cli, {
+    });
+    assert(result);
+    result = embeddedCliAddBinding(cli, {
         "backup",
         "backup the preset to USB drive, or all presets if none specified. usage: backup [preset name]",
         true,
         pm,
         static_fatfs_backup
-    }));
-    assert(embeddedCliAddBinding(cli, {
+    });
+    assert(result);
+    result = embeddedCliAddBinding(cli, {
         "restore",
         "restore the preset from the USB drive. usage: restore <preset name>",
         true,
         pm,
         static_fatfs_restore
-    }));
+    });
+    assert(result);
+    (void)result;
 }
 
 void rppicomidi::Preset_manager_cli::static_save_current_preset(EmbeddedCli* cli, char* args, void* context)

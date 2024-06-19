@@ -27,13 +27,15 @@
 #include "pico/assert.h"
 rppicomidi::BLE_MIDI_Manager_cli::BLE_MIDI_Manager_cli(EmbeddedCli* cli_, BLE_MIDI_Manager* blem_) : cli{cli_}
 {
-    assert(embeddedCliAddBinding(cli, {
+    volatile bool result = embeddedCliAddBinding(cli, {
         "btmidi-disconnect",
         "disconnect an active connection",
         false,
         blem_,
         static_disconnect
-    }));
+    });
+    assert(result);
+    (void)result;
 }
 
 void rppicomidi::BLE_MIDI_Manager_cli::static_disconnect(EmbeddedCli *, char *, void *context)
