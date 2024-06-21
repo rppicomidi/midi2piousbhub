@@ -78,13 +78,18 @@
 #include "ble_midi_manager.h"
 #include "ble_midi_profile.h"
 rppicomidi::BLE_MIDI_Manager* rppicomidi::BLE_MIDI_Manager::instance=nullptr;
-rppicomidi::BLE_MIDI_Manager::BLE_MIDI_Manager(const char* local_name, size_t local_name_len) : con_handle{HCI_CON_HANDLE_INVALID}
+
+rppicomidi::BLE_MIDI_Manager::BLE_MIDI_Manager(const char* local_name) : con_handle{HCI_CON_HANDLE_INVALID},
+    initialized{false}
 {
-    // The maximum local name length is 13 bytes because the maximum scan response is 15 bytes.
-    if (local_name_len > 13)
-        local_name_len = 13;
-    scan_resp_data[0] = local_name_len+1;
+    size_t local_name_len = strlen(local_name);
+    // The maximum local name length is 29 bytes because the maximum scan response is 31 bytes.
     scan_resp_data[1] = BLUETOOTH_DATA_TYPE_COMPLETE_LOCAL_NAME;
+    if (local_name_len > 29) {
+        local_name_len = 29;
+        scan_resp_data[1] = BLUETOOTH_DATA_TYPE_SHORTENED_LOCAL_NAME;
+    }
+    scan_resp_data[0] = local_name_len+1;
     memcpy(scan_resp_data+2, local_name, local_name_len);
     scan_resp_data_len = local_name_len+2;
 }
@@ -247,11 +252,17 @@ void rppicomidi::BLE_MIDI_Manager::static_packet_handler(uint8_t packet_type, ui
     instance->packet_handler(packet_type, channel, packet, size);
 }
 
-bool rppicomidi::BLE_MIDI_Manager::init(BLE_MIDI_Manager* instance_)
+bool rppicomidi::BLE_MIDI_Manager::init(BLE_MIDI_Manager* instance_, bool is_client_)
 {
+    if (initialized) {
+        deinit(is_client);
+        initialized = false;
+    }
+    is_client = is_client_;
+
     instance = instance_;
     con_handle = HCI_CON_HANDLE_INVALID;
-        // initialize CYW43 driver architecture (will enable BT if/because CYW43_ENABLE_BLUETOOTH == 1)
+    // initialize CYW43 driver architecture (will enable BT if/because CYW43_ENABLE_BLUETOOTH == 1)
     if (cyw43_arch_init()) {
         printf("ble-midi2usbhost: failed to initialize cyw43_arch\n");
         return false;
@@ -260,18 +271,40 @@ bool rppicomidi::BLE_MIDI_Manager::init(BLE_MIDI_Manager* instance_)
 
     sm_init();
 
-    att_server_init(profile_data, NULL, NULL);
     // just works, legacy pairing, with bonding
     sm_set_io_capabilities(IO_CAPABILITY_NO_INPUT_NO_OUTPUT);
     sm_set_authentication_requirements(SM_AUTHREQ_SECURE_CONNECTION | SM_AUTHREQ_BONDING);
     // register for SM events
     sm_event_callback_registration.callback = &static_packet_handler;
     sm_add_event_handler(&sm_event_callback_registration);
-    midi_service_stream_init(sm_event_callback_registration.callback);
+    if (is_client) {
+
+    }
+    else {
+        att_server_init(profile_data, NULL, NULL);
+        midi_service_stream_init(sm_event_callback_registration.callback);
+    }
 
     // turn on bluetooth
     hci_power_control(HCI_POWER_ON);
+    initialized = true;
     return true;
+}
+
+void rppicomidi::BLE_MIDI_Manager::deinit(bool is_client)
+{
+    if (!initialized)
+        return; // nothing to do
+    (void)is_client; //todo
+    hci_power_control(HCI_POWER_OFF);
+    sm_remove_event_handler(&sm_event_callback_registration);
+    if (!is_client)
+        att_server_deinit();
+    sm_deinit();
+    l2cap_deinit();
+    cyw43_arch_deinit();
+    initialized = false;
+    con_handle = HCI_CON_HANDLE_INVALID;
 }
 
 uint8_t rppicomidi::BLE_MIDI_Manager::stream_read(uint8_t* bytes, uint8_t max_bytes)
@@ -294,5 +327,260 @@ void rppicomidi::BLE_MIDI_Manager::disconnect()
 {
     if (is_connected())
         gap_disconnect(con_handle);
+}
+
+void rppicomidi::BLE_MIDI_Manager::list_le_device_info()
+{
+    int max_count = le_device_db_max_count();
+    bd_addr_t entry_address;
+    const char* addr_type_str[] = {"0 LE public",
+                             "1 LE random",
+                             "2 LE public identity",
+                             "3 LE random identity"};
+    int count = 0;
+    printf("\r\nBonded Device List\r\n");
+    printf("Entry Bluetooth Address Type\r\n");
+    for (int idx=0; idx < max_count; idx++) {
+        int entry_address_type = (int) BD_ADDR_TYPE_UNKNOWN;
+        le_device_db_info(idx, &entry_address_type, entry_address, NULL);
+        // skip non-LE and unused entries
+        if (entry_address_type >= (int)BD_ADDR_TYPE_SCO)
+            continue;
+        printf("  %02d  %02x:%02x:%02x:%02x:%02x:%02x %s\r\n", idx,
+            entry_address[0],entry_address[1],entry_address[2],entry_address[3],
+            entry_address[4],entry_address[5], addr_type_str[entry_address_type]);
+        ++count;
+    }
+    printf("\r\ntotal of %d bonded entries of %d maximum entries\r\n", count, max_count);
+}
+
+void rppicomidi::BLE_MIDI_Manager::delete_le_bonding_info(int idx)
+{
+    int max_count = le_device_db_max_count();
+    if (idx >= max_count) {
+        printf("invalid device index %d\r\n", idx);
+        return;
+    }
+    bd_addr_t entry_address;
+    int entry_address_type = (int) BD_ADDR_TYPE_UNKNOWN;
+    le_device_db_info(idx, &entry_address_type, entry_address, NULL);
+    if (entry_address_type <= (int)BD_ADDR_TYPE_LE_RANDOM_IDENTITY) {
+        printf("deleting entry=%d addr=%02x:%02x:%02x:%02x:%02x:%02x\r\n",
+            idx, entry_address[0],entry_address[1],entry_address[2],entry_address[3],
+            entry_address[4],entry_address[5]);
+        gap_delete_bonding(static_cast<bd_addr_type_t>(entry_address_type), entry_address);
+    }
+    else {
+        printf("invalid device index %d\r\n", idx);
+        return;
+    }
+}
+
+typedef struct advertising_report {
+    uint8_t   type;
+    uint8_t   event_type;
+    uint8_t   address_type;
+    bd_addr_t address;
+    uint8_t   rssi;
+    uint8_t   length;
+    const uint8_t * data;
+} advertising_report_t;
+
+
+void rppicomidi::BLE_MIDI_Manager::static_handle_gatt_client_event(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size)
+{
+    instance->handle_gatt_client_event(packet_type, channel, packet, size);
+}
+
+static void printUUID(uint8_t * uuid128, uint16_t uuid16){
+    if (uuid16){
+        printf("%04x",uuid16);
+    } else {
+        printf("%s", uuid128_to_str(uuid128));
+    }
+}
+static void dump_characteristic(gatt_client_characteristic_t * characteristic){
+    printf("    * characteristic: [0x%04x-0x%04x-0x%04x], properties 0x%02x, uuid ",
+                            characteristic->start_handle, characteristic->value_handle, characteristic->end_handle, characteristic->properties);
+    printUUID(characteristic->uuid128, characteristic->uuid16);
+    printf("\n");
+}
+
+static void dump_service(gatt_client_service_t * service){
+    printf("    * service: [0x%04x-0x%04x], uuid ", service->start_group_handle, service->end_group_handle);
+    printUUID(service->uuid128, service->uuid16);
+    printf("\n");
+}
+
+static int service_count = 0;
+static int service_index = 0;
+static gatt_client_service_t services[40];
+void rppicomidi::BLE_MIDI_Manager::handle_gatt_client_event(uint8_t , uint16_t , uint8_t *packet, uint16_t )
+{
+    gatt_client_service_t service;
+    gatt_client_characteristic_t characteristic;
+    switch(hci_event_packet_get_type(packet)){
+        case GATT_EVENT_SERVICE_QUERY_RESULT:
+            gatt_event_service_query_result_get_service(packet, &service);
+            dump_service(&service);
+            services[service_count++] = service;
+            break;
+        case GATT_EVENT_CHARACTERISTIC_QUERY_RESULT:
+            gatt_event_characteristic_query_result_get_characteristic(packet, &characteristic);
+            dump_characteristic(&characteristic);
+            break;
+        case GATT_EVENT_QUERY_COMPLETE:
+            // GATT_EVENT_QUERY_COMPLETE of search characteristics
+            if (service_index < service_count) {
+                service = services[service_index++];
+                printf("\nGATT browser - CHARACTERISTIC for SERVICE %s, [0x%04x-0x%04x]\n",
+                    uuid128_to_str(service.uuid128), service.start_group_handle, service.end_group_handle);
+                gatt_client_discover_characteristics_for_service(static_handle_gatt_client_event, con_handle, &service);
+                break;
+            }
+            service_index = 0;
+            break;
+        default:
+            printf("unhandled packet type %u", hci_event_packet_get_type(packet));
+            break;
+    }
+}
+
+bool rppicomidi::BLE_MIDI_Manager::get_local_name_from_ad_data(uint8_t ad_len, const uint8_t* ad_data, Advertised_MIDI_Peripheral& peripheral)
+{
+    bool success = false;
+    ad_context_t context;
+    if (peripheral.type == BLUETOOTH_DATA_TYPE_COMPLETE_LOCAL_NAME)
+        return false; // don't copy over the complete local name
+    
+    ad_iterator_init(&context, ad_len, ad_data);
+    while ( ad_iterator_has_more(&context) ){
+        uint8_t data_type = ad_iterator_get_data_type(&context);
+        uint8_t data_len  = ad_iterator_get_data_len(&context);
+        const uint8_t * data = ad_iterator_get_data(&context);
+        if (data_len >= sizeof(peripheral.name))
+            data_len = sizeof(peripheral.name) - 1;
+        switch (data_type){
+            case BLUETOOTH_DATA_TYPE_COMPLETE_LOCAL_NAME:
+            case BLUETOOTH_DATA_TYPE_SHORTENED_LOCAL_NAME:                
+                memcpy(peripheral.name, data, data_len);
+                peripheral.name[data_len] = '\0';
+                peripheral.type = data_type;
+                success = true;
+                break;
+            default:
+                break;
+        }  
+        ad_iterator_next(&context);
+    }
+    return success;
+}
+
+void rppicomidi::BLE_MIDI_Manager::handle_hci_event(uint8_t packet_type, uint16_t, uint8_t *packet, uint16_t)
+{
+    if (packet_type != HCI_EVENT_PACKET) return;
+    //advertising_report_t report;
+    
+    uint8_t event = hci_event_packet_get_type(packet);
+    const uint8_t* ad_data;
+    uint8_t ad_data_len;
+    bd_addr_t bdaddr;
+    const uint8_t midi_profile_uuid128[] = { 0x03, 0xB8, 0x0E, 0x5A, 0xED, 0xE8, 0x4B, 0x33, 0xA7, 0x51, 0x6C, 0xE3, 0x4E, 0xC4, 0xC7, 0x00 };
+    uint64_t idx; // The BD_ADDR converted to a 64-bit index into the map
+    bool mapped; // true if the advertising report is from a BD_ADDR already mapped
+    Advertised_MIDI_Peripheral peripheral;
+    switch (event) {
+        case BTSTACK_EVENT_STATE:
+            // BTstack activated, get started
+            if (btstack_event_state_get_state(packet) != HCI_STATE_WORKING) break;
+            midi_peripherals.clear();
+            printf("BTstack activated, start active scanning\n");
+            gap_set_scan_params(1,0x0030, 0x0030,0);
+            gap_start_scan();
+            break;
+        case GAP_EVENT_ADVERTISING_REPORT:
+            ad_data_len = gap_event_advertising_report_get_data_length(packet);
+            ad_data = gap_event_advertising_report_get_data(packet);
+            gap_event_advertising_report_get_address(packet, bdaddr);
+            idx = bdaddr2uint64(bdaddr);
+            mapped = midi_peripherals.find(idx) != midi_peripherals.end();
+            if (ad_data_contains_uuid128(ad_data_len, ad_data, midi_profile_uuid128) || mapped) {
+
+                if (mapped) {
+                    if (midi_peripherals[idx].type == BLUETOOTH_DATA_TYPE_COMPLETE_LOCAL_NAME)
+                        break; // no need to repeat ourselves.
+                    peripheral = midi_peripherals[idx];
+                }
+                else {
+                    // initialize the map with the BD_ADDR as the name
+                    peripheral.type = 0;
+                    memcpy(peripheral.name, bd_addr_to_str(bdaddr), strlen(bd_addr_to_str(bdaddr)));
+                    midi_peripherals[idx] = peripheral;
+                }
+                if (get_local_name_from_ad_data(ad_data_len, ad_data, peripheral)) {
+                    midi_peripherals[idx] = peripheral;
+                }
+                printf("    * adv. event: addr=%s[%s]\r\n", bd_addr_to_str(bdaddr), peripheral.name);
+            }
+            //fill_advertising_report_from_packet(&report, packet);
+            //dump_advertising_report(&report);
+
+            // stop scanning, and connect to the device
+            //gap_stop_scan();
+            //gap_connect(report.address,report.address_type);
+            break;
+        case HCI_EVENT_LE_META:
+            // wait for connection complete
+            if (hci_event_le_meta_get_subevent_code(packet) !=  HCI_SUBEVENT_LE_CONNECTION_COMPLETE) {
+                break;
+            }
+            printf("\nGATT browser - CONNECTED\n");
+            con_handle = hci_subevent_le_connection_complete_get_connection_handle(packet);
+            // query primary services
+            gatt_client_discover_primary_services(static_handle_gatt_client_event, con_handle);
+            break;
+        case HCI_EVENT_DISCONNECTION_COMPLETE:
+            printf("\nGATT browser - DISCONNECTED\n");
+            service_count = 0;
+            service_index = 0;
+            break;
+        default:
+            break;
+    }
+}
+
+void rppicomidi::BLE_MIDI_Manager::static_handle_hci_event(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size)
+{
+    instance->handle_hci_event(packet_type, channel, packet, size);
+}
+
+/**
+ * @brief start the Bluetooth low energy scan discovery process
+ * 
+ */
+void rppicomidi::BLE_MIDI_Manager::scan()
+{
+    if (initialized)
+        deinit(is_client);
+        
+    if (cyw43_arch_init() != 0) {
+        printf("error initializing CYW43_ARCH\r\n");
+        return;
+    }
+
+    // Initialize L2CAP and register HCI event handler
+    l2cap_init();
+
+    // Initialize GATT client 
+    gatt_client_init();
+
+    // Optinoally, Setup security manager
+    sm_init();
+    sm_set_io_capabilities(IO_CAPABILITY_NO_INPUT_NO_OUTPUT);
+    // register for HCI events
+    hci_event_callback_registration.callback = &static_handle_hci_event;
+    hci_add_event_handler(&hci_event_callback_registration);
+    hci_power_control(HCI_POWER_ON);
+    initialized = true;
 }
 #endif

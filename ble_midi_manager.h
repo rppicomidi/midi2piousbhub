@@ -71,6 +71,8 @@
  */
 #pragma once
 
+#include <string>
+#include <map>
 #include "btstack.h"
 #include "pico/cyw43_arch.h"
 #include "pico/btstack_cyw43.h"
@@ -83,24 +85,33 @@ public:
     /**
      * @brief Construct a new ble midi manager object
      * 
-     * @param local_name the local name (if more than 13 characters, will be truncated)
-     * @param local_name_len the number of characters in the local name
+     * @param local_name the local name; null terminated string (if more than 29 characters, will be truncated)
      */
-    BLE_MIDI_Manager(const char* local_name, size_t local_name_len);
+    BLE_MIDI_Manager(const char* local_name);
 
     BLE_MIDI_Manager()=delete;
     ~BLE_MIDI_Manager()=default;
     BLE_MIDI_Manager(const BLE_MIDI_Manager&)=delete;
     void operator=(const BLE_MIDI_Manager&)=delete;
 
+    enum LE_Advertising_Report_Event_Type {
+        ADV_IND = 0,
+        ADV_DIRECT_IND = 1,
+        ADV_SCAN_IND = 2,
+        ADV_NONCONN_IND = 3,
+        SCAN_RSP = 4,
+    };
+
     /**
      * @brief Initialize the Bluetooth system and start connection advertisements
      * 
      * @param instance_ a pointer to an instance of this class
+     * @param is_client_ is true if initializing as a client; false otherwise
      * @return true if Bluetooth system successfully initialized, false otherwise
      */
-    bool init(BLE_MIDI_Manager* instance_);
+    bool init(BLE_MIDI_Manager* instance_, bool is_client_);
 
+    void deinit(bool is_client);
     /**
      * @brief see if the Bluetooth LE MIDI device is connected
      * 
@@ -132,9 +143,54 @@ public:
      * 
      */
     void disconnect();
+
+    /**
+     * @brief list the bonded Bluetooth LE devices
+     * 
+     */
+    void list_le_device_info();
+
+    /**
+     * @brief delete the bonding information at entry idx
+     * 
+     * @param idx the database index of the Bluetooth LE device
+     */
+    void delete_le_bonding_info(int idx);
+
+    void scan();
 private:
+    /**
+     * @brief called by static_packet_handler to handle BT Stack messages
+     * 
+     * @param packet_type the type of the BT Stack packet
+     * @param channel the BT Stack channel
+     * @param packet the packet data
+     * @param size the size of the packet in bytes
+     */
     void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size);
+    // Handles connect, disconnect, and advertising report events,  
+    // starts the GATT client, and sends the first query.
+    void handle_hci_event(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size);
+    static void static_handle_hci_event(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size);
     static void static_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size);
+    void handle_gatt_client_event(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size);
+    static void static_handle_gatt_client_event(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size);
+    /**
+     * @brief 
+     * 
+     * @param bdaddr the 6 byte Bluetooth Address
+     * @return a 64-bit version of the address
+     */
+    uint64_t bdaddr2uint64(uint8_t* bdaddr) {
+        return (uint64_t)bdaddr[0] | ((uint64_t)bdaddr[1] << 8) |
+        ((uint64_t)bdaddr[2] << 16) | ((uint64_t)bdaddr[3] << 24) |
+        ((uint64_t)bdaddr[32] << 8) | ((uint64_t)bdaddr[1] << 40);
+    }
+    struct Advertised_MIDI_Peripheral {
+        char name[32];
+        uint8_t type; // BDADDR = 0; otherwise COMPLETE or SHORTENED
+    };
+    bool get_local_name_from_ad_data(uint8_t ad_len, const uint8_t* ad_data, Advertised_MIDI_Peripheral& peripheral);
     static const uint8_t APP_AD_FLAGS=0x06;
     static constexpr uint8_t adv_data[]{
         // Flags general discoverable
@@ -143,10 +199,17 @@ private:
         0x11, BLUETOOTH_DATA_TYPE_COMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS, 0x00, 0xc7, 0xc4, 0x4e, 0xe3, 0x6c, 0x51, 0xa7, 0x33, 0x4b, 0xe8, 0xed, 0x5a, 0x0e, 0xb8, 0x03,
     };
     static const uint8_t adv_data_len = sizeof(adv_data);
-    uint8_t scan_resp_data[16];
+    uint8_t scan_resp_data[32];
     uint8_t scan_resp_data_len;
     hci_con_handle_t con_handle;
+    bool is_client;
+    bool initialized;
     btstack_packet_callback_registration_t sm_event_callback_registration;
+    btstack_packet_callback_registration_t hci_event_callback_registration;
     static BLE_MIDI_Manager* instance;
+    /**
+     * @brief a map of BLE MIDI peripheral bdaddr to local name strings
+     */
+    std::map<uint64_t, Advertised_MIDI_Peripheral> midi_peripherals;
 };
 }

@@ -35,6 +35,30 @@ rppicomidi::BLE_MIDI_Manager_cli::BLE_MIDI_Manager_cli(EmbeddedCli* cli_, BLE_MI
         static_disconnect
     });
     assert(result);
+    result = embeddedCliAddBinding(cli, {
+        "btmidi-list",
+        "list bonded devices",
+        false,
+        blem_,
+        static_list_bonded_devices
+    });
+    assert(result);
+    result = embeddedCliAddBinding(cli, {
+        "btmidi-rm",
+        "remove the device specified by the index from the bonded database",
+        false,
+        blem_,
+        static_delete_bonded_device_by_index
+    });
+    assert(result);
+    result = embeddedCliAddBinding(cli, {
+        "btmidi-scan",
+        "start a scan for MIDI devices",
+        false,
+        blem_,
+        static_scan
+    });
+    assert(result);
     (void)result;
 }
 
@@ -45,5 +69,28 @@ void rppicomidi::BLE_MIDI_Manager_cli::static_disconnect(EmbeddedCli *, char *, 
         blem->disconnect();
     else
         printf("Already disconnected\r\n");
+}
+
+void rppicomidi::BLE_MIDI_Manager_cli::static_list_bonded_devices(EmbeddedCli *, char *, void *context)
+{
+    auto blem = reinterpret_cast<BLE_MIDI_Manager*>(context);
+    blem->list_le_device_info();
+}
+
+void rppicomidi::BLE_MIDI_Manager_cli::static_delete_bonded_device_by_index(EmbeddedCli *, char *args, void *context)
+{
+    if (embeddedCliGetTokenCount(args) != 1) {
+        printf("usage: btmidi-rm <entry number>\r\n");
+        return;
+    }
+    int idx = atoi(embeddedCliGetToken(args, 1));
+    auto blem = reinterpret_cast<BLE_MIDI_Manager*>(context);
+    blem->delete_le_bonding_info(idx);
+}
+
+void rppicomidi::BLE_MIDI_Manager_cli::static_scan(EmbeddedCli *, char *, void *context)
+{
+    auto blem = reinterpret_cast<BLE_MIDI_Manager*>(context);
+    blem->scan();
 }
 #endif
