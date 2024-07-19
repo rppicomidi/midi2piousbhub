@@ -362,7 +362,7 @@ void rppicomidi::Midi2PioUsbhub::blink_led()
         #ifndef RPPICOMIDI_PICO_W
         gpio_put(LED_GPIO, led_state);
         #else
-        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, led_state);
+        // TODO: cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, led_state);
         #endif
         // Toggle the led_state & update the timestamp
         led_state = !led_state;
@@ -552,7 +552,7 @@ rppicomidi::Midi2PioUsbhub::Midi2PioUsbhub() : cli{&preset_manager}
     preset_manager.init();
 #if RPPICOMIDI_PICO_W
     // The Pico W LED is attached to the CYW43 WiFi/Bluetooth module
-    // start up Bluetooth
+    // start up Bluetooth in server mode
     blem.init(&blem, false);
 #endif
     cli.printWelcome();
@@ -658,7 +658,7 @@ void rppicomidi::Midi2PioUsbhub::task()
 // Main loop
 int main()
 {
-    // default 125MHz is not appropreate. Sysclock should be multiple of 12MHz.
+    // default 125MHz is not appropriate. Sysclock should be multiple of 12MHz.
     set_sys_clock_khz(120000, true);
 
     sleep_ms(10);

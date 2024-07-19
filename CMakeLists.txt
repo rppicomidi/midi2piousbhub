@@ -53,6 +53,9 @@ add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/lib/pico-w-ble-midi-lib)
 target_compile_definitions(${target_proj} PRIVATE
   RPPICOMIDI_PICO_W
 )
+# suppress warning about ABI change in GCC 7.1. AFAIK, it does not matter in this context. Please see
+# https://stackoverflow.com/questions/48149323/what-does-the-gcc-warning-project-parameter-passing-for-x-changed-in-gcc-7-1-m
+target_compile_options( ${target_proj} PRIVATE -Wno-psabi)
 target_include_directories(${target_proj} PRIVATE
     ${CMAKE_CURRENT_LIST_DIR} # For btstack config, etc.
     )

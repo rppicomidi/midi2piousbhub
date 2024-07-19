@@ -157,7 +157,34 @@ public:
      */
     void delete_le_bonding_info(int idx);
 
-    void scan();
+    /**
+     * @brief Start scan mode
+     * 
+     */
+    void scan_begin();
+
+    /**
+     * @brief Stop scan mode
+     * 
+     */
+    void scan_end();
+
+    /**
+     * @brief Write out a list of MIDI peripherals to the console
+     * 
+     */
+    void dump_midi_peripherals();
+
+    /**
+     * @brief In client mode, connect to the specified device
+     * @param idx 0: is the previously connected peripheral
+     *            1 or greater: is the idx from the midi_peripherals
+     *            list as displayed by dump_midi_peripherals
+     * @return true if successful, false if idx==0 and no previously
+     *         connected device is stored, or idx is greater than the
+     *         number of peripherals discovered in the last scan.
+     */
+    bool client_request_connect(uint8_t idx);
 private:
     /**
      * @brief called by static_packet_handler to handle BT Stack messages
@@ -175,6 +202,7 @@ private:
     static void static_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size);
     void handle_gatt_client_event(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size);
     static void static_handle_gatt_client_event(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size);
+    static void static_scan_timer_cb(btstack_timer_source_t* timer);
     /**
      * @brief 
      * 
@@ -184,11 +212,31 @@ private:
     uint64_t bdaddr2uint64(uint8_t* bdaddr) {
         return (uint64_t)bdaddr[0] | ((uint64_t)bdaddr[1] << 8) |
         ((uint64_t)bdaddr[2] << 16) | ((uint64_t)bdaddr[3] << 24) |
-        ((uint64_t)bdaddr[32] << 8) | ((uint64_t)bdaddr[1] << 40);
+        ((uint64_t)bdaddr[4] << 32) | ((uint64_t)bdaddr[5] << 40);
     }
+
+    /**
+     * @brief convert a bdaddr encoded in a uint64_t to a 6-byte bdaddr
+     * 
+     * @param bdaddr64 
+     * @param bdaddr 
+     */
+    void uint64_2bdaddr(uint64_t bdaddr64, uint8_t* bdaddr) {
+        for (int jdx = 0; jdx < 6; jdx++) {
+            bdaddr[jdx] = (bdaddr64 >> (uint64_t)(8*jdx)) & 0xff;    
+        }
+    }
+
+    void enter_client_mode();
+    static uint32_t const scan_blink_timeout_ms = 500;
+    static int32_t const scan_remove_timeout = 6; // when decremented to 0, remove entry from midi_peripherals (in units of scan_blink_timeout_ms)
+
     struct Advertised_MIDI_Peripheral {
+        Advertised_MIDI_Peripheral() : type{0}, timeout{0} {}
         char name[32];
         uint8_t type; // BDADDR = 0; otherwise COMPLETE or SHORTENED
+        uint8_t addr_type;
+        int32_t timeout;
     };
     bool get_local_name_from_ad_data(uint8_t ad_len, const uint8_t* ad_data, Advertised_MIDI_Peripheral& peripheral);
     static const uint8_t APP_AD_FLAGS=0x06;
@@ -202,11 +250,16 @@ private:
     uint8_t scan_resp_data[32];
     uint8_t scan_resp_data_len;
     hci_con_handle_t con_handle;
+    uint16_t conn_interval;
     bool is_client;
     bool initialized;
+    bool is_scan_mode;
     btstack_packet_callback_registration_t sm_event_callback_registration;
     btstack_packet_callback_registration_t hci_event_callback_registration;
     static BLE_MIDI_Manager* instance;
+    btstack_timer_source_t scan_timer;
+    bd_addr_type_t next_connect_bd_addr_type;
+    uint8_t next_connect_bd_addr[6];
     /**
      * @brief a map of BLE MIDI peripheral bdaddr to local name strings
      */

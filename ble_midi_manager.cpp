@@ -80,7 +80,7 @@
 rppicomidi::BLE_MIDI_Manager* rppicomidi::BLE_MIDI_Manager::instance=nullptr;
 
 rppicomidi::BLE_MIDI_Manager::BLE_MIDI_Manager(const char* local_name) : con_handle{HCI_CON_HANDLE_INVALID},
-    initialized{false}
+    is_client{false}, initialized{false}, is_scan_mode{false}
 {
     size_t local_name_len = strlen(local_name);
     // The maximum local name length is 29 bytes because the maximum scan response is 31 bytes.
@@ -131,6 +131,10 @@ void rppicomidi::BLE_MIDI_Manager::packet_handler(uint8_t packet_type, uint16_t 
                 case HCI_EVENT_DISCONNECTION_COMPLETE:
                     printf("ble-midi2usbhost: HCI_EVENT_DISCONNECTION_COMPLETE event\r\n");
                     con_handle = HCI_CON_HANDLE_INVALID;
+                    if (is_client && next_connect_bd_addr_type <= BD_ADDR_TYPE_LE_RANDOM_IDENTITY) {
+                        // honor pending connection request
+                        gap_connect(next_connect_bd_addr, next_connect_bd_addr_type);
+                    }
                     break;
                 case HCI_EVENT_GATTSERVICE_META:
                     switch(hci_event_gattservice_meta_get_subevent_code(packet)) {
@@ -295,11 +299,16 @@ void rppicomidi::BLE_MIDI_Manager::deinit(bool is_client)
 {
     if (!initialized)
         return; // nothing to do
-    (void)is_client; //todo
+
     hci_power_control(HCI_POWER_OFF);
     sm_remove_event_handler(&sm_event_callback_registration);
-    if (!is_client)
+    if (is_client) {
+        scan_end();
+    }
+    else {
         att_server_deinit();
+    }
+
     sm_deinit();
     l2cap_deinit();
     cyw43_arch_deinit();
@@ -325,6 +334,7 @@ uint8_t rppicomidi::BLE_MIDI_Manager::stream_write(const uint8_t* bytes, uint8_t
 
 void rppicomidi::BLE_MIDI_Manager::disconnect()
 {
+    next_connect_bd_addr_type = BD_ADDR_TYPE_UNKNOWN;
     if (is_connected())
         gap_disconnect(con_handle);
 }
@@ -433,7 +443,7 @@ void rppicomidi::BLE_MIDI_Manager::handle_gatt_client_event(uint8_t , uint16_t ,
             // GATT_EVENT_QUERY_COMPLETE of search characteristics
             if (service_index < service_count) {
                 service = services[service_index++];
-                printf("\nGATT browser - CHARACTERISTIC for SERVICE %s, [0x%04x-0x%04x]\n",
+                printf("\nCHARACTERISTIC for SERVICE %s, [0x%04x-0x%04x]\n",
                     uuid128_to_str(service.uuid128), service.start_group_handle, service.end_group_handle);
                 gatt_client_discover_characteristics_for_service(static_handle_gatt_client_event, con_handle, &service);
                 break;
@@ -488,15 +498,29 @@ void rppicomidi::BLE_MIDI_Manager::handle_hci_event(uint8_t packet_type, uint16_
     const uint8_t midi_profile_uuid128[] = { 0x03, 0xB8, 0x0E, 0x5A, 0xED, 0xE8, 0x4B, 0x33, 0xA7, 0x51, 0x6C, 0xE3, 0x4E, 0xC4, 0xC7, 0x00 };
     uint64_t idx; // The BD_ADDR converted to a 64-bit index into the map
     bool mapped; // true if the advertising report is from a BD_ADDR already mapped
+    int err;
     Advertised_MIDI_Peripheral peripheral;
     switch (event) {
         case BTSTACK_EVENT_STATE:
             // BTstack activated, get started
-            if (btstack_event_state_get_state(packet) != HCI_STATE_WORKING) break;
-            midi_peripherals.clear();
-            printf("BTstack activated, start active scanning\n");
-            gap_set_scan_params(1,0x0030, 0x0030,0);
-            gap_start_scan();
+            if (btstack_event_state_get_state(packet) != HCI_STATE_WORKING)
+                break;
+            if (is_client) {
+                if (is_scan_mode) {
+                    midi_peripherals.clear();
+                    printf("BTstack activated, start active scanning\n");
+                    gap_set_scan_params(1,0x0030, 0x0030,0);
+                    gap_start_scan();
+                }
+                else {
+                    if (next_connect_bd_addr_type != BD_ADDR_TYPE_UNKNOWN) {
+                        gap_connect(next_connect_bd_addr, next_connect_bd_addr_type);
+                    }
+                }
+            }
+            else {
+
+            }
             break;
         case GAP_EVENT_ADVERTISING_REPORT:
             ad_data_len = gap_event_advertising_report_get_data_length(packet);
@@ -505,44 +529,54 @@ void rppicomidi::BLE_MIDI_Manager::handle_hci_event(uint8_t packet_type, uint16_
             idx = bdaddr2uint64(bdaddr);
             mapped = midi_peripherals.find(idx) != midi_peripherals.end();
             if (ad_data_contains_uuid128(ad_data_len, ad_data, midi_profile_uuid128) || mapped) {
-
                 if (mapped) {
-                    if (midi_peripherals[idx].type == BLUETOOTH_DATA_TYPE_COMPLETE_LOCAL_NAME)
+                    if (midi_peripherals[idx].type == BLUETOOTH_DATA_TYPE_COMPLETE_LOCAL_NAME) {
+                        midi_peripherals[idx].timeout = scan_remove_timeout;
                         break; // no need to repeat ourselves.
+                    }
                     peripheral = midi_peripherals[idx];
                 }
                 else {
-                    // initialize the map with the BD_ADDR as the name
+                    // initialize the map with the BD_ADDR as the name and record the address type
                     peripheral.type = 0;
+                    // Need the address type to connect
+                    peripheral.addr_type = gap_event_advertising_report_get_address_type(packet);
                     memcpy(peripheral.name, bd_addr_to_str(bdaddr), strlen(bd_addr_to_str(bdaddr)));
                     midi_peripherals[idx] = peripheral;
                 }
+                midi_peripherals[idx].timeout = scan_remove_timeout; // do not time out this entry
                 if (get_local_name_from_ad_data(ad_data_len, ad_data, peripheral)) {
                     midi_peripherals[idx] = peripheral;
                 }
-                printf("    * adv. event: addr=%s[%s]\r\n", bd_addr_to_str(bdaddr), peripheral.name);
+                //printf("    * adv. event: addr=%s[%s]\r\n", bd_addr_to_str(bdaddr), peripheral.name);
             }
-            //fill_advertising_report_from_packet(&report, packet);
-            //dump_advertising_report(&report);
-
-            // stop scanning, and connect to the device
-            //gap_stop_scan();
-            //gap_connect(report.address,report.address_type);
             break;
         case HCI_EVENT_LE_META:
             // wait for connection complete
             if (hci_event_le_meta_get_subevent_code(packet) !=  HCI_SUBEVENT_LE_CONNECTION_COMPLETE) {
                 break;
             }
-            printf("\nGATT browser - CONNECTED\n");
+            printf("\nCONNECTED\n");
             con_handle = hci_subevent_le_connection_complete_get_connection_handle(packet);
+            // print connection parameters (without using float operations)
+            conn_interval = hci_subevent_le_connection_complete_get_conn_interval(packet);
+            printf("Connection Interval: %u.%02u ms\n", conn_interval * 125 / 100, 25 * (conn_interval & 3));
+            printf("Connection Latency: %u\n", hci_subevent_le_connection_complete_get_conn_latency(packet));
+            // initialize gatt client context with handle, and add it to the list of active clients
             // query primary services
-            gatt_client_discover_primary_services(static_handle_gatt_client_event, con_handle);
+            printf("Search for MIDI service.\n");
+            err = gatt_client_discover_primary_services_by_uuid128(static_handle_gatt_client_event, con_handle, midi_profile_uuid128);
+            if (err != ERROR_CODE_SUCCESS)
+                printf("Error(%d): Failed to discover primary services by uuid128\r\n", err);
+
             break;
         case HCI_EVENT_DISCONNECTION_COMPLETE:
-            printf("\nGATT browser - DISCONNECTED\n");
+            printf("\nDISCONNECTED\n");
             service_count = 0;
             service_index = 0;
+            // disconnected from previous and connected to new
+            if (is_client && !is_scan_mode && BD_ADDR_TYPE_UNKNOWN != next_connect_bd_addr_type)
+                gap_connect(next_connect_bd_addr, next_connect_bd_addr_type);
             break;
         default:
             break;
@@ -554,15 +588,39 @@ void rppicomidi::BLE_MIDI_Manager::static_handle_hci_event(uint8_t packet_type, 
     instance->handle_hci_event(packet_type, channel, packet, size);
 }
 
-/**
- * @brief start the Bluetooth low energy scan discovery process
- * 
- */
-void rppicomidi::BLE_MIDI_Manager::scan()
+void rppicomidi::BLE_MIDI_Manager::static_scan_timer_cb(btstack_timer_source_t* timer_)
 {
+    static bool led_on = true;
+
+    led_on = !led_on;
+    auto mp = reinterpret_cast<BLE_MIDI_Manager*>(timer_->context);
+    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, led_on);
+    // update midi_peripherals timeouts
+    for (auto &it: mp->midi_peripherals) {
+        --it.second.timeout;
+    }
+    // Remove items with expired timeouts
+    for (auto it = mp->midi_peripherals.cbegin(); it != mp->midi_peripherals.cend(); /* no increment*/)
+    {
+        if (it->second.timeout <= 0) {
+            it = mp->midi_peripherals.erase(it);
+        }
+        else {
+            ++it;
+        }
+    }
+    // Restart timer
+    btstack_run_loop_set_timer(timer_, scan_blink_timeout_ms);
+    btstack_run_loop_add_timer(timer_);
+}
+
+void rppicomidi::BLE_MIDI_Manager::enter_client_mode()
+{
+    // TODO change function to know whether to connect to a server
+    // once client mode comes up.
     if (initialized)
         deinit(is_client);
-        
+    is_client = true;
     if (cyw43_arch_init() != 0) {
         printf("error initializing CYW43_ARCH\r\n");
         return;
@@ -574,13 +632,82 @@ void rppicomidi::BLE_MIDI_Manager::scan()
     // Initialize GATT client 
     gatt_client_init();
 
-    // Optinoally, Setup security manager
+    // Optionally, Setup security manager
     sm_init();
     sm_set_io_capabilities(IO_CAPABILITY_NO_INPUT_NO_OUTPUT);
+    sm_set_authentication_requirements(SM_AUTHREQ_SECURE_CONNECTION | SM_AUTHREQ_BONDING);
     // register for HCI events
     hci_event_callback_registration.callback = &static_handle_hci_event;
     hci_add_event_handler(&hci_event_callback_registration);
+}
+
+void rppicomidi::BLE_MIDI_Manager::scan_begin()
+{    
+    enter_client_mode();
+    is_scan_mode = true;
+    // set up the scan timer to report newly discovered devices
+    btstack_run_loop_set_timer_handler(&scan_timer, static_scan_timer_cb);
+    btstack_run_loop_set_timer_context(&scan_timer, this);
+    btstack_run_loop_set_timer(&scan_timer, scan_blink_timeout_ms);
     hci_power_control(HCI_POWER_ON);
+    btstack_run_loop_add_timer(&scan_timer);
     initialized = true;
+}
+
+void rppicomidi::BLE_MIDI_Manager::scan_end()
+{
+    if (!is_scan_mode)
+        return;
+    gap_stop_scan();
+    btstack_run_loop_remove_timer(&scan_timer);
+    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, false);
+    is_scan_mode = false;
+}
+
+void rppicomidi::BLE_MIDI_Manager::dump_midi_peripherals()
+{
+    uint16_t idx = 1;
+    printf("Index Bluetooth Address Name\r\n");
+    for (auto it: midi_peripherals) {
+        uint8_t bdaddr[6];
+        uint64_2bdaddr(it.first, bdaddr);
+
+        printf("%-5u %s %s\r\n", idx, bd_addr_to_str(bdaddr), it.second.name );
+    }
+}
+
+bool rppicomidi::BLE_MIDI_Manager::client_request_connect(uint8_t idx)
+{
+    if (idx == 0) {
+        // TODO: retrieve the last connected device and connect
+        // if it exists. For now, just return false
+        return false;
+    }
+    int jdx = 1;
+    for (auto it: midi_peripherals) {
+        if (jdx == idx) {
+            uint64_2bdaddr(it.first, next_connect_bd_addr);
+            next_connect_bd_addr_type = static_cast<bd_addr_type_t>(it.second.addr_type);
+            if (is_scan_mode) {
+                scan_end();
+                gap_connect(next_connect_bd_addr, next_connect_bd_addr_type);
+            }
+            else if (is_client) {
+                if (is_connected()) {
+                    gap_disconnect(con_handle);
+                }
+                else {
+                    gap_connect(next_connect_bd_addr, next_connect_bd_addr_type);
+                }
+            }
+            else {
+                enter_client_mode();
+                hci_power_control(HCI_POWER_ON);
+                initialized = true;
+            }
+            return true;
+        }
+    }
+    return false;
 }
 #endif

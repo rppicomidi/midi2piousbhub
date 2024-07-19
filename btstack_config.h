@@ -7,7 +7,7 @@
 
 // BTstack features that can be enabled
 #define ENABLE_LE_PERIPHERAL
-#define ENABLE_LE_CENTRAL
+#define RUNNING_AS_CLIENT 1 // To allow to run as client, too
 #define ENABLE_LOG_INFO
 #define ENABLE_LOG_ERROR
 #define ENABLE_PRINTF_HEXDUMP

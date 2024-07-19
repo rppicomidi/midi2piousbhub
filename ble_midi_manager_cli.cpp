@@ -52,13 +52,38 @@ rppicomidi::BLE_MIDI_Manager_cli::BLE_MIDI_Manager_cli(EmbeddedCli* cli_, BLE_MI
     });
     assert(result);
     result = embeddedCliAddBinding(cli, {
-        "btmidi-scan",
+        "btmidi-scan-begin",
         "start a scan for MIDI devices",
         false,
         blem_,
-        static_scan
+        static_scan_begin
     });
     assert(result);
+    result = embeddedCliAddBinding(cli, {
+        "btmidi-scan-list",
+        "list all found MIDI devices",
+        false,
+        blem_,
+        static_scan_list
+    });
+    assert(result);
+    result = embeddedCliAddBinding(cli, {
+        "btmidi-scan-end",
+        "end scan for MIDI devices and list all found",
+        false,
+        blem_,
+        static_scan_end
+    });
+    assert(result);
+    result = embeddedCliAddBinding(cli, {
+        "btmidi-client-connect",
+        "blmidi-client-connect <0 for last connected or index number from scan list>",
+        true,
+        blem_,
+        static_client_connect
+    });
+    assert(result);
+
     (void)result;
 }
 
@@ -88,9 +113,35 @@ void rppicomidi::BLE_MIDI_Manager_cli::static_delete_bonded_device_by_index(Embe
     blem->delete_le_bonding_info(idx);
 }
 
-void rppicomidi::BLE_MIDI_Manager_cli::static_scan(EmbeddedCli *, char *, void *context)
+void rppicomidi::BLE_MIDI_Manager_cli::static_scan_begin(EmbeddedCli *, char *, void *context)
 {
     auto blem = reinterpret_cast<BLE_MIDI_Manager*>(context);
-    blem->scan();
+    blem->scan_begin();
+}
+
+void rppicomidi::BLE_MIDI_Manager_cli::static_scan_end(EmbeddedCli *, char *, void *context)
+{
+    auto blem = reinterpret_cast<BLE_MIDI_Manager*>(context);
+    blem->scan_end();
+    blem->dump_midi_peripherals();
+}
+
+void rppicomidi::BLE_MIDI_Manager_cli::static_scan_list(EmbeddedCli *, char *, void *context)
+{
+    auto blem = reinterpret_cast<BLE_MIDI_Manager*>(context);
+    blem->dump_midi_peripherals();
+}
+
+void rppicomidi::BLE_MIDI_Manager_cli::static_client_connect(EmbeddedCli *, char *args, void *context)
+{
+    auto blem = reinterpret_cast<BLE_MIDI_Manager*>(context);
+    if (embeddedCliGetTokenCount(args) != 1) {
+        printf("blmidi-client-connect <0 for last connected or index number from scan list>\r\n");
+        return;
+    }
+    uint8_t idx = std::atoi(embeddedCliGetToken(args, 1));
+    if (!blem->client_request_connect(idx)) {
+        printf("could not connect to index==%u\r\n", idx);
+    }
 }
 #endif
