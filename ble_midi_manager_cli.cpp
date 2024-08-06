@@ -113,34 +113,37 @@ void rppicomidi::BLE_MIDI_Manager_cli::static_delete_bonded_device_by_index(Embe
     blem->delete_le_bonding_info(idx);
 }
 
-void rppicomidi::BLE_MIDI_Manager_cli::static_scan_begin(EmbeddedCli *, char *, void *context)
+void rppicomidi::BLE_MIDI_Manager_cli::static_scan_begin(EmbeddedCli *, char *, void * context)
 {
     auto blem = reinterpret_cast<BLE_MIDI_Manager*>(context);
     blem->scan_begin();
 }
 
-void rppicomidi::BLE_MIDI_Manager_cli::static_scan_end(EmbeddedCli *, char *, void *context)
+void rppicomidi::BLE_MIDI_Manager_cli::static_scan_end(EmbeddedCli *, char *, void *)
 {
-    auto blem = reinterpret_cast<BLE_MIDI_Manager*>(context);
-    blem->scan_end();
-    blem->dump_midi_peripherals();
+    //auto blem = reinterpret_cast<BLE_MIDI_Manager*>(context);
+    //blem->scan_end();
+    //blem->dump_midi_peripherals();
+    ble_midi_client_scan_end();
+    ble_midi_client_dump_midi_peripherals();
 }
 
-void rppicomidi::BLE_MIDI_Manager_cli::static_scan_list(EmbeddedCli *, char *, void *context)
+void rppicomidi::BLE_MIDI_Manager_cli::static_scan_list(EmbeddedCli *, char *, void *)
 {
-    auto blem = reinterpret_cast<BLE_MIDI_Manager*>(context);
-    blem->dump_midi_peripherals();
+    //auto blem = reinterpret_cast<BLE_MIDI_Manager*>(context);
+    //blem->dump_midi_peripherals();
+    ble_midi_client_dump_midi_peripherals();
 }
 
-void rppicomidi::BLE_MIDI_Manager_cli::static_client_connect(EmbeddedCli *, char *args, void *context)
+void rppicomidi::BLE_MIDI_Manager_cli::static_client_connect(EmbeddedCli *, char *args, void *)
 {
-    auto blem = reinterpret_cast<BLE_MIDI_Manager*>(context);
+    //auto blem = reinterpret_cast<BLE_MIDI_Manager*>(context);
     if (embeddedCliGetTokenCount(args) != 1) {
         printf("blmidi-client-connect <0 for last connected or index number from scan list>\r\n");
         return;
     }
     uint8_t idx = std::atoi(embeddedCliGetToken(args, 1));
-    if (!blem->client_request_connect(idx)) {
+    if (!ble_midi_client_request_connect(idx)) {
         printf("could not connect to index==%u\r\n", idx);
     }
 }

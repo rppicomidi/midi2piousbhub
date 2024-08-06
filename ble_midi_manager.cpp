@@ -129,20 +129,23 @@ void rppicomidi::BLE_MIDI_Manager::packet_handler(uint8_t packet_type, uint16_t 
 
                     break;
                 case HCI_EVENT_DISCONNECTION_COMPLETE:
-                    printf("ble-midi2usbhost: HCI_EVENT_DISCONNECTION_COMPLETE event\r\n");
+                    printf("blem: HCI_EVENT_DISCONNECTION_COMPLETE event\r\n");
                     con_handle = HCI_CON_HANDLE_INVALID;
+#if 0
                     if (is_client && next_connect_bd_addr_type <= BD_ADDR_TYPE_LE_RANDOM_IDENTITY) {
                         // honor pending connection request
                         gap_connect(next_connect_bd_addr, next_connect_bd_addr_type);
                     }
+#endif
                     break;
                 case HCI_EVENT_GATTSERVICE_META:
                     switch(hci_event_gattservice_meta_get_subevent_code(packet)) {
                         case GATTSERVICE_SUBEVENT_SPP_SERVICE_CONNECTED:
                             con_handle = gattservice_subevent_spp_service_connected_get_con_handle(packet);
+                            printf("blem: GATTSERVICE_SUBEVENT_SPP_SERVICE_CONNECTED event handle = %u\r\n", con_handle);
                             break;
                         case GATTSERVICE_SUBEVENT_SPP_SERVICE_DISCONNECTED:
-                            printf("ble-midi2usbhost: GATTSERVICE_SUBEVENT_SPP_SERVICE_DISCONNECTED event\r\n");
+                            printf("blem: GATTSERVICE_SUBEVENT_SPP_SERVICE_DISCONNECTED event\r\n");
                             con_handle = HCI_CON_HANDLE_INVALID;
                             break;
                         default:
@@ -150,44 +153,44 @@ void rppicomidi::BLE_MIDI_Manager::packet_handler(uint8_t packet_type, uint16_t 
                     }
                     break;
                 case SM_EVENT_JUST_WORKS_REQUEST:
-                    printf("ble-midi2usbhost: Just Works requested\n");
+                    printf("blem: Just Works requested\n");
                     sm_just_works_confirm(sm_event_just_works_request_get_handle(packet));
                     break;
                 case SM_EVENT_NUMERIC_COMPARISON_REQUEST:
-                    printf("ble-midi2usbhost: Confirming numeric comparison: %" PRIu32 "\n", sm_event_numeric_comparison_request_get_passkey(packet));
+                    printf("blem: Confirming numeric comparison: %" PRIu32 "\n", sm_event_numeric_comparison_request_get_passkey(packet));
                     sm_numeric_comparison_confirm(sm_event_passkey_display_number_get_handle(packet));
                     break;
                 case SM_EVENT_PASSKEY_DISPLAY_NUMBER:
-                    printf("ble-midi2usbhost: Display Passkey: %" PRIu32 "\n", sm_event_passkey_display_number_get_passkey(packet));
+                    printf("blem: Display Passkey: %" PRIu32 "\n", sm_event_passkey_display_number_get_passkey(packet));
                     break;
                 case SM_EVENT_IDENTITY_CREATED:
                     sm_event_identity_created_get_identity_address(packet, addr);
-                    printf("ble-midi2usbhost: Identity created: type %u address %s\n", sm_event_identity_created_get_identity_addr_type(packet), bd_addr_to_str(addr));
+                    printf("blem: Identity created: type %u address %s\n", sm_event_identity_created_get_identity_addr_type(packet), bd_addr_to_str(addr));
                     break;
                 case SM_EVENT_IDENTITY_RESOLVING_SUCCEEDED:
                     sm_event_identity_resolving_succeeded_get_identity_address(packet, addr);
-                    printf("ble-midi2usbhost: Identity resolved: type %u address %s\n", sm_event_identity_resolving_succeeded_get_identity_addr_type(packet), bd_addr_to_str(addr));
+                    printf("blem: Identity resolved: type %u address %s\n", sm_event_identity_resolving_succeeded_get_identity_addr_type(packet), bd_addr_to_str(addr));
                     break;
                 case SM_EVENT_IDENTITY_RESOLVING_FAILED:
                     sm_event_identity_created_get_address(packet, addr);
-                    printf("ble-midi2usbhost: Identity resolving failed\n");
+                    printf("blem: Identity resolving failed\n");
                     break;
                 case SM_EVENT_PAIRING_STARTED:
-                    printf("Pairing started\n");
+                    printf("blem: Pairing started\n");
                     break;
                 case SM_EVENT_PAIRING_COMPLETE:
                     switch (sm_event_pairing_complete_get_status(packet)){
                         case ERROR_CODE_SUCCESS:
-                            printf("ble-midi2usbhost: Pairing complete, success\n");
+                            printf("blem: Pairing complete, success\n");
                             break;
                         case ERROR_CODE_CONNECTION_TIMEOUT:
-                            printf("ble-midi2usbhost: Pairing failed, timeout\n");
+                            printf("blem: Pairing failed, timeout\n");
                             break;
                         case ERROR_CODE_REMOTE_USER_TERMINATED_CONNECTION:
-                            printf("ble-midi2usbhost: Pairing failed, disconnected\n");
+                            printf("blem: Pairing failed, disconnected\n");
                             break;
                         case ERROR_CODE_AUTHENTICATION_FAILURE:
-                            printf("ble-midi2usbhost: Pairing failed, authentication failure with reason = %u\n", sm_event_pairing_complete_get_reason(packet));
+                            printf("blem: Pairing failed, authentication failure with reason = %u\n", sm_event_pairing_complete_get_reason(packet));
                             break;
                         default:
                             break;
@@ -195,22 +198,22 @@ void rppicomidi::BLE_MIDI_Manager::packet_handler(uint8_t packet_type, uint16_t 
                     break;
                 case SM_EVENT_REENCRYPTION_STARTED:
                     sm_event_reencryption_complete_get_address(packet, addr);
-                    printf("ble-midi2usbhost: Bonding information exists for addr type %u, identity addr %s -> re-encryption started\n",
+                    printf("blem: Bonding information exists for addr type %u, identity addr %s -> re-encryption started\n",
                         sm_event_reencryption_started_get_addr_type(packet), bd_addr_to_str(addr));
                     break;
                 case SM_EVENT_REENCRYPTION_COMPLETE:
                     switch (sm_event_reencryption_complete_get_status(packet)){
                         case ERROR_CODE_SUCCESS:
-                            printf("ble-midi2usbhost: Re-encryption complete, success\n");
+                            printf("blem: Re-encryption complete, success\n");
                             break;
                         case ERROR_CODE_CONNECTION_TIMEOUT:
-                            printf("ble-midi2usbhost: Re-encryption failed, timeout\n");
+                            printf("blem: Re-encryption failed, timeout\n");
                             break;
                         case ERROR_CODE_REMOTE_USER_TERMINATED_CONNECTION:
-                            printf("ble-midi2usbhost: Re-encryption failed, disconnected\n");
+                            printf("blem: Re-encryption failed, disconnected\n");
                             break;
                         case ERROR_CODE_PIN_OR_KEY_MISSING:
-                            printf("ble-midi2usbhost: Re-encryption failed, bonding information missing\n\n");
+                            printf("blem: Re-encryption failed, bonding information missing\n\n");
                             printf("Assuming remote lost bonding information\n");
                             printf("Deleting local bonding information to allow for new pairing...\n");
                             sm_event_reencryption_complete_get_address(packet, addr);
@@ -225,19 +228,19 @@ void rppicomidi::BLE_MIDI_Manager::packet_handler(uint8_t packet_type, uint16_t 
                     status = gatt_event_query_complete_get_att_status(packet);
                     switch (status){
                         case ATT_ERROR_INSUFFICIENT_ENCRYPTION:
-                            printf("ble-midi2usbhost: GATT Query failed, Insufficient Encryption\n");
+                            printf("blem: GATT Query failed, Insufficient Encryption\n");
                             break;
                         case ATT_ERROR_INSUFFICIENT_AUTHENTICATION:
-                            printf("ble-midi2usbhost: GATT Query failed, Insufficient Authentication\n");
+                            printf("blem: GATT Query failed, Insufficient Authentication\n");
                             break;
                         case ATT_ERROR_BONDING_INFORMATION_MISSING:
-                            printf("ble-midi2usbhost: GATT Query failed, Bonding Information Missing\n");
+                            printf("blem: GATT Query failed, Bonding Information Missing\n");
                             break;
                         case ATT_ERROR_SUCCESS:
-                            printf("ble-midi2usbhost: GATT Query successful\n");
+                            printf("blem: GATT Query successful\n");
                             break;
                         default:
-                            printf("ble-midi2usbhost: GATT Query failed, status 0x%02x\n", gatt_event_query_complete_get_att_status(packet));
+                            printf("blem: GATT Query failed, status 0x%02x\n", gatt_event_query_complete_get_att_status(packet));
                             break;
                     }
                     break;
@@ -263,9 +266,15 @@ bool rppicomidi::BLE_MIDI_Manager::init(BLE_MIDI_Manager* instance_, bool is_cli
         initialized = false;
     }
     is_client = is_client_;
-
     instance = instance_;
+    if (is_client) {
+        const char client_name[]="Pico W MIDI USB BLE Hub";
+        ble_midi_client_init(&static_packet_handler, client_name, strlen(client_name));
+        return true;
+    }
+
     con_handle = HCI_CON_HANDLE_INVALID;
+    printf("con_handle initialized\r\n");
     // initialize CYW43 driver architecture (will enable BT if/because CYW43_ENABLE_BLUETOOTH == 1)
     if (cyw43_arch_init()) {
         printf("ble-midi2usbhost: failed to initialize cyw43_arch\n");
@@ -303,7 +312,7 @@ void rppicomidi::BLE_MIDI_Manager::deinit(bool is_client)
     hci_power_control(HCI_POWER_OFF);
     sm_remove_event_handler(&sm_event_callback_registration);
     if (is_client) {
-        scan_end();
+        ble_midi_client_scan_end();
     }
     else {
         att_server_deinit();
@@ -314,29 +323,45 @@ void rppicomidi::BLE_MIDI_Manager::deinit(bool is_client)
     cyw43_arch_deinit();
     initialized = false;
     con_handle = HCI_CON_HANDLE_INVALID;
+    printf("con_handle deinit\r\n");
 }
 
 uint8_t rppicomidi::BLE_MIDI_Manager::stream_read(uint8_t* bytes, uint8_t max_bytes)
 {
     uint16_t timestamp;
-    if (is_connected())
-        return midi_service_stream_read(con_handle, max_bytes, bytes, &timestamp);
+    if (is_connected()) {
+        if (is_client)
+            return ble_midi_client_stream_read(con_handle, max_bytes, bytes, &timestamp);
+        else
+            return midi_service_stream_read(con_handle, max_bytes, bytes, &timestamp);
+    }
     return 0;
 }
 
 uint8_t rppicomidi::BLE_MIDI_Manager::stream_write(const uint8_t* bytes, uint8_t num_bytes)
 {
     if (is_connected()) {
-        return midi_service_stream_write(con_handle, num_bytes, bytes);
+        if (is_client) {
+            return ble_midi_client_stream_write(con_handle, num_bytes, bytes);
+        }
+        else {
+            return midi_service_stream_write(con_handle, num_bytes, bytes);
+        }
     }
     return 0;
 }
 
 void rppicomidi::BLE_MIDI_Manager::disconnect()
 {
-    next_connect_bd_addr_type = BD_ADDR_TYPE_UNKNOWN;
-    if (is_connected())
-        gap_disconnect(con_handle);
+    //next_connect_bd_addr_type = BD_ADDR_TYPE_UNKNOWN;
+    if (is_connected()) {
+        if (is_client) {
+            ble_midi_client_request_disconnect(con_handle);
+        }
+        else {
+            gap_disconnect(con_handle);
+        }
+    }
 }
 
 void rppicomidi::BLE_MIDI_Manager::list_le_device_info()
@@ -386,17 +411,20 @@ void rppicomidi::BLE_MIDI_Manager::delete_le_bonding_info(int idx)
     }
 }
 
-typedef struct advertising_report {
-    uint8_t   type;
-    uint8_t   event_type;
-    uint8_t   address_type;
-    bd_addr_t address;
-    uint8_t   rssi;
-    uint8_t   length;
-    const uint8_t * data;
-} advertising_report_t;
+void rppicomidi::BLE_MIDI_Manager::scan_begin()
+{    
+    if (!is_client) {
+        deinit(is_client);
+        const char client_name[]="Pico W MIDI USB BLE Hub";
+        ble_midi_client_init(&static_packet_handler, client_name, strlen(client_name));
+    }
+    ble_midi_client_scan_begin();
+    is_scan_mode = true;
+    is_client = true;
+    initialized = true;
+}
 
-
+#if 0
 void rppicomidi::BLE_MIDI_Manager::static_handle_gatt_client_event(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size)
 {
     instance->handle_gatt_client_event(packet_type, channel, packet, size);
@@ -489,7 +517,6 @@ bool rppicomidi::BLE_MIDI_Manager::get_local_name_from_ad_data(uint8_t ad_len, c
 void rppicomidi::BLE_MIDI_Manager::handle_hci_event(uint8_t packet_type, uint16_t, uint8_t *packet, uint16_t)
 {
     if (packet_type != HCI_EVENT_PACKET) return;
-    //advertising_report_t report;
     
     uint8_t event = hci_event_packet_get_type(packet);
     const uint8_t* ad_data;
@@ -641,19 +668,6 @@ void rppicomidi::BLE_MIDI_Manager::enter_client_mode()
     hci_add_event_handler(&hci_event_callback_registration);
 }
 
-void rppicomidi::BLE_MIDI_Manager::scan_begin()
-{    
-    enter_client_mode();
-    is_scan_mode = true;
-    // set up the scan timer to report newly discovered devices
-    btstack_run_loop_set_timer_handler(&scan_timer, static_scan_timer_cb);
-    btstack_run_loop_set_timer_context(&scan_timer, this);
-    btstack_run_loop_set_timer(&scan_timer, scan_blink_timeout_ms);
-    hci_power_control(HCI_POWER_ON);
-    btstack_run_loop_add_timer(&scan_timer);
-    initialized = true;
-}
-
 void rppicomidi::BLE_MIDI_Manager::scan_end()
 {
     if (!is_scan_mode)
@@ -710,4 +724,5 @@ bool rppicomidi::BLE_MIDI_Manager::client_request_connect(uint8_t idx)
     }
     return false;
 }
+#endif
 #endif

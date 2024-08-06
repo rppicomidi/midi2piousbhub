@@ -77,6 +77,7 @@
 #include "pico/cyw43_arch.h"
 #include "pico/btstack_cyw43.h"
 #include "midi_service_stream_handler.h"
+#include "ble_midi_client.h"
 
 namespace rppicomidi
 {
@@ -158,13 +159,13 @@ public:
     void delete_le_bonding_info(int idx);
 
     /**
-     * @brief Start scan mode
+     * @brief Start active scan. If necessary, exit server mode and switch to client mode first.
      * 
      */
     void scan_begin();
 
     /**
-     * @brief Stop scan mode
+     * @brief Stop active scan
      * 
      */
     void scan_end();
@@ -200,6 +201,7 @@ private:
     void handle_hci_event(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size);
     static void static_handle_hci_event(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size);
     static void static_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size);
+#if 0
     void handle_gatt_client_event(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size);
     static void static_handle_gatt_client_event(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size);
     static void static_scan_timer_cb(btstack_timer_source_t* timer);
@@ -264,5 +266,22 @@ private:
      * @brief a map of BLE MIDI peripheral bdaddr to local name strings
      */
     std::map<uint64_t, Advertised_MIDI_Peripheral> midi_peripherals;
+#endif
+    static const uint8_t APP_AD_FLAGS=0x06;
+    static constexpr uint8_t adv_data[]{
+        // Flags general discoverable
+        0x02, BLUETOOTH_DATA_TYPE_FLAGS, APP_AD_FLAGS,
+        // Service class list
+        0x11, BLUETOOTH_DATA_TYPE_COMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS, 0x00, 0xc7, 0xc4, 0x4e, 0xe3, 0x6c, 0x51, 0xa7, 0x33, 0x4b, 0xe8, 0xed, 0x5a, 0x0e, 0xb8, 0x03,
+    };
+    static const uint8_t adv_data_len = sizeof(adv_data);
+    uint8_t scan_resp_data[32];
+    uint8_t scan_resp_data_len;
+    hci_con_handle_t con_handle;
+    bool is_client;
+    bool initialized;
+    bool is_scan_mode;
+    btstack_packet_callback_registration_t sm_event_callback_registration;
+    static BLE_MIDI_Manager* instance;
 };
 }
