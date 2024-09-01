@@ -59,6 +59,7 @@
 // in the ring_buffer_init() function call and then use
 // that value to enable or disable only that peripheral IRQ.
 // Uncomment the example below to do that
+#if 0
 #include "hardware/irq.h"
 
 #define RING_BUFFER_ENTER_CRITICAL(X) \
@@ -66,5 +67,5 @@
 
 #define RING_BUFFER_EXIT_CRITICAL(X) \
     do {irq_set_enabled(ring_buf->critical_section_data, true);} while (0)
-
+#endif
 #endif

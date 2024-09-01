@@ -116,17 +116,41 @@ bool rppicomidi::Preset_manager::save_current_preset(std::string preset_name)
 bool rppicomidi::Preset_manager::update_current_preset(std::string& preset_name, bool mount)
 {
     bool result = true;
+    // See if the current preset file is present
+    // If it isn't, clear current_preset_name. This
+    // can happen if someone deletes the file
+    // or reformats the the littlefs file system
+    // outside of the control of Preset_manager.
+    if (mount) {
+        int err = pico_mount(false);
+        if (err != 0) {
+            printf("Error %s mounting the flash file system\r\n", pico_errmsg(err));
+            return false;
+        }
+    }
+
+    lfs_file_t file;
+    int error_code = lfs_file_open(&file, current_preset_filename, LFS_O_RDONLY); // open for read (see if file exists)
+    if (error_code == LFS_ERR_OK) {
+        char curr_preset[LFS_NAME_MAX+1];
+        lfs_ssize_t nread = lfs_file_read(&file, curr_preset, LFS_NAME_MAX);
+        if (nread > 0) {
+            curr_preset[nread] = '\0'; // just in case
+            current_preset_name = std::string(curr_preset);
+        }
+        error_code = lfs_file_close(&file);
+        if (error_code != LFS_ERR_OK) {
+            if (mount)
+                pico_unmount();
+            return false;
+        }
+    }
+    else {
+        current_preset_name = "";
+    }
 
     // only need to do stuff if the preset_name is not the current_preset_name
     if (preset_name != current_preset_name) {
-        if (mount) {
-            int err = pico_mount(false);
-            if (err != 0) {
-                printf("Error %s mounting the flash file system\r\n", pico_errmsg(err));
-                return false;
-            }
-        }
-        lfs_file_t file;
         int error_code = lfs_file_open(&file, current_preset_filename,
                                     LFS_O_WRONLY | LFS_O_TRUNC | LFS_O_CREAT); // open for write, truncate if it exists and create if it doesn't
         if (error_code != LFS_ERR_OK) {
@@ -137,19 +161,25 @@ bool rppicomidi::Preset_manager::update_current_preset(std::string& preset_name,
         }
         auto size = lfs_file_write(&file, preset_name.c_str(), preset_name.length());
         error_code = lfs_file_close(&file);
+        if (error_code != LFS_ERR_OK) {
+            result = false;
+            printf("error %s closing to file %s\r\n", pico_errmsg(error_code), current_preset_filename);
+        }
         if (size < 0 || size != static_cast<lfs_ssize_t>(preset_name.length())) {
             printf("error %s writing preset name to file %s\r\n", pico_errmsg(size), current_preset_filename);
-            if (error_code != LFS_ERR_OK) {
-                printf("error %s closing to file %s\r\n", pico_errmsg(error_code), current_preset_filename);
-            }
             result = false;
         }
-        else { 
+        if (result) { 
             current_preset_name = preset_name;
+        }
+        else {
+            current_preset_name = "";
         }
         if (mount)
             pico_unmount();
     }
+    else if (mount)
+        pico_unmount();
     return result;
 }
 

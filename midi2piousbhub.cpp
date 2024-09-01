@@ -81,6 +81,7 @@
 #include "pico/stdlib.h"
 #include "pico/binary_info.h"
 #include "pico/multicore.h"
+#include "hardware/clocks.h"
 #include "midi_uart_lib.h"
 #include "cdc_stdio_lib.h"
 #include "bsp/board_api.h"
@@ -101,17 +102,27 @@ void core1_main()
     pio_usb_configuration_t pio_cfg = PIO_USB_DEFAULT_CONFIG;
     // Use GP16 for USB D+ and GP17 for USB D-
     pio_cfg.pin_dp = 16;
+    #if 0
     // Swap PIOs from default. The RX state machine takes up the
     // whole PIO program memory. Without these two lines, if you
     // try to use this code on a Pico W board, the CYW43 SPI PIO
     // code, which runs on PIO 1, won't fit.
     // Other potential conflict is the DMA channel tx_ch. However,
     // the CYW43 SPI driver code is not hard-wired to any particular
-    // DMA channel, so as long as tuh_configure() and tuh_ini()run
+    // DMA channel, so as long as tuh_configure() and tuh_init()run
     // after board_init(), which also calls tuh_configure(), and before
     // cyw43_arch_init(), there should be no conflict.
     pio_cfg.pio_rx_num = 0;
     pio_cfg.pio_tx_num = 1;
+    #endif
+    // Pico-PIO-USB 0.6.0 consumes all of PIO 0. The Pico W CYW43 SPI PIO
+    // code uses some of PIO 1. So the PIO usages no longer conflicts. However,
+    // there is still a chance that the DMA tx_ch will conflict with the
+    // Pico W CYW43 SPI PIO code. However,
+    // the CYW43 SPI driver code is not hard-wired to any particular
+    // DMA channel, so as long as tuh_configure() and tuh_init()run
+    // after board_init(), which also calls tuh_configure(), and before
+    // cyw43_arch_init(), there should be no conflict.
     tuh_configure(BOARD_TUH_RHPORT, TUH_CFGID_RPI_PIO_USB_CONFIGURATION, &pio_cfg);
 
     // To run USB SOF interrupt in core1, init host stack for pio_usb (roothub
@@ -123,7 +134,6 @@ void core1_main()
     printf("core1 has booted\r\n");
     while (true) {
         tuh_task(); // tinyusb host task
-        rppicomidi::Midi2PioUsbhub::instance().blink_led();
         rppicomidi::Midi2PioUsbhub::instance().flush_usb_tx();
     }
 }
@@ -372,14 +382,17 @@ void rppicomidi::Midi2PioUsbhub::blink_led()
 
 void rppicomidi::Midi2PioUsbhub::flush_usb_tx()
 {
+    uint32_t port_flushed_mask = 0;
     for (auto &out_port : midi_out_port_list)
     {
         // Call tuh_midi_stream_flush() once per output port device address
-        if (out_port->devaddr != uart_devaddr &&
-            out_port->cable == 0 &&
+        uint32_t port_mask = 1 << out_port->devaddr;
+        if (out_port->devaddr < CFG_TUH_DEVICE_MAX &&
+            (port_flushed_mask && port_mask) == 0 &&
             tuh_midi_configured(out_port->devaddr))
         {
             tuh_midi_stream_flush(out_port->devaddr);
+            port_flushed_mask |= port_mask;
         }
     }
 }
@@ -488,7 +501,7 @@ rppicomidi::Midi2PioUsbhub::Midi2PioUsbhub() : cli{&preset_manager}
     bi_decl(bi_1pin_with_name(LED_GPIO, "On-board LED"));
     bi_decl(bi_2pins_with_names(MIDI_UART_TX_GPIO, "MIDI UART TX", MIDI_UART_RX_GPIO, "MIDI UART RX"));
 
-    board_init();
+    // board_init(); is called before this class is created in main();
     tud_init(BOARD_TUD_RHPORT);
     cdc_stdio_lib_init();
 
@@ -553,7 +566,8 @@ rppicomidi::Midi2PioUsbhub::Midi2PioUsbhub() : cli{&preset_manager}
 #if RPPICOMIDI_PICO_W
     // The Pico W LED is attached to the CYW43 WiFi/Bluetooth module
     // start up Bluetooth in server mode
-    blem.init(&blem, false);
+    //blem.init(&blem, false);
+    //blem.init(&blem, true);
 #endif
     cli.printWelcome();
 }
@@ -673,6 +687,14 @@ int main()
     while(core1_booting) {
     }
     rppicomidi::Midi2PioUsbhub &instance = rppicomidi::Midi2PioUsbhub::instance();
+#if RPPICOMIDI_PICO_W
+    if (!instance.blem_init(true)) {
+        printf("Error starting up Bluetooth Module\r\nProgam stalled\r\n");
+        for (;;) {
+            tight_loop_contents();
+        }
+    }
+#endif
     core0_booting = false;
     while (1) {
         instance.task();

@@ -7,11 +7,10 @@
 
 // BTstack features that can be enabled
 #define ENABLE_LE_PERIPHERAL
-#define RUNNING_AS_CLIENT 1 // To allow to run as client, too
-#define ENABLE_LOG_INFO
+#define ENABLE_LOG_INFO 1
 #define ENABLE_LOG_ERROR
 #define ENABLE_PRINTF_HEXDUMP
-#define ENABLE_LE_SECURE_CONNECTIONS
+#define ENABLE_LE_SECURE_CONNECTIONS 1
 // should be helpful for throughput for long sysex messages
 // #define ENABLE_LE_DATA_LENGTH_EXTENSION
 
@@ -20,15 +19,13 @@
 // comment out to enable the MIDI clock real-time message from server to client
 // #define BLE_MIDI_SERVER_FILTER_MIDI_CLOCK_TO_BLE
 // comment out to enable the Active Sensing real-time message from server to client
-#define BLE_MIDI_SERVER_FILTER_ACTIVE_SENSING_TO_BLE
+#define BLE_MIDI_SERVER_FILTER_ACTIVE_SENSING_TO_BLE 1
 
 // for the client
-#if RUNNING_AS_CLIENT
-#define ENABLE_LE_CENTRAL
+#define ENABLE_LE_CENTRAL 1
+#define ENABLE_GATT_CLIENT_PAIRING 1
+#define ENABLE_LE_PRIVACY_ADDRESS_RESOLUTION 1
 #define MAX_NR_GATT_CLIENTS 1
-#else
-#define MAX_NR_GATT_CLIENTS 0
-#endif
 
 // BTstack configuration. buffers, sizes, ...
 #define HCI_OUTGOING_PRE_BUFFER_SIZE 4

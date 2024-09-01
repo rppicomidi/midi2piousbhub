@@ -184,6 +184,9 @@ namespace rppicomidi
         const std::vector<Midi_out_port *>& get_midi_out_port_list() {return midi_out_port_list; }
         const std::vector<Midi_in_port *>& get_midi_in_port_list() {return midi_in_port_list; }
         void notify_cdc_state_changed() {cdc_state_has_changed = true; }
+#if RPPICOMIDI_PICO_W
+        bool blem_init(bool is_client) { return blem.init(&blem, is_client);}
+#endif
     private:
         Midi2PioUsbhub();
         Preset_manager preset_manager;

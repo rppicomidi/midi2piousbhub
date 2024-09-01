@@ -51,7 +51,9 @@ add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/lib/pico-w-ble-midi-lib)
 
 # add additional compile and link options
 target_compile_definitions(${target_proj} PRIVATE
-  RPPICOMIDI_PICO_W
+  RPPICOMIDI_PICO_W=1
+  #uncomment this to see the bluetooth trace on the serial port
+  #WANT_HCI_DUMP=1
 )
 # suppress warning about ABI change in GCC 7.1. AFAIK, it does not matter in this context. Please see
 # https://stackoverflow.com/questions/48149323/what-does-the-gcc-warning-project-parameter-passing-for-x-changed-in-gcc-7-1-m
@@ -62,6 +64,7 @@ target_include_directories(${target_proj} PRIVATE
 target_link_libraries(${target_proj}
   pico_cyw43_arch_none
   ble_midi_service_lib
+  ble_midi_client_lib
   pico_btstack_cyw43
 )
 target_sources(${target_proj} PRIVATE
