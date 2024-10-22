@@ -102,19 +102,7 @@ void core1_main()
     pio_usb_configuration_t pio_cfg = PIO_USB_DEFAULT_CONFIG;
     // Use GP16 for USB D+ and GP17 for USB D-
     pio_cfg.pin_dp = 16;
-    #if 0
-    // Swap PIOs from default. The RX state machine takes up the
-    // whole PIO program memory. Without these two lines, if you
-    // try to use this code on a Pico W board, the CYW43 SPI PIO
-    // code, which runs on PIO 1, won't fit.
-    // Other potential conflict is the DMA channel tx_ch. However,
-    // the CYW43 SPI driver code is not hard-wired to any particular
-    // DMA channel, so as long as tuh_configure() and tuh_init()run
-    // after board_init(), which also calls tuh_configure(), and before
-    // cyw43_arch_init(), there should be no conflict.
-    pio_cfg.pio_rx_num = 0;
-    pio_cfg.pio_tx_num = 1;
-    #endif
+
     // Pico-PIO-USB 0.6.0 consumes all of PIO 0. The Pico W CYW43 SPI PIO
     // code uses some of PIO 1. So the PIO usages no longer conflicts. However,
     // there is still a chance that the DMA tx_ch will conflict with the
@@ -563,12 +551,7 @@ rppicomidi::Midi2PioUsbhub::Midi2PioUsbhub() : cli{&preset_manager}
     midi_in_port_list.push_back(&ble_midi_in_port);
     midi_out_port_list.push_back(&ble_midi_out_port);
     preset_manager.init();
-#if RPPICOMIDI_PICO_W
-    // The Pico W LED is attached to the CYW43 WiFi/Bluetooth module
-    // start up Bluetooth in server mode
-    //blem.init(&blem, false);
-    //blem.init(&blem, true);
-#endif
+
     cli.printWelcome();
 }
 
@@ -918,37 +901,6 @@ void rppicomidi::Midi2PioUsbhub::tuh_midi_rx_cb(uint8_t dev_addr, uint32_t num_p
                 {
                     for (auto &out_port : in_port->sends_data_to_list)
                     {
-#if 0
-                        if (out_port->devaddr != 0 && attached_devices[out_port->devaddr].configured)
-                        {
-                            if (out_port->devaddr < uart_devaddr)
-                            {
-                                uint32_t nwritten = tuh_midi_stream_write(out_port->devaddr, out_port->cable, buffer, bytes_read);
-                                if (nwritten != bytes_read) {
-                                    TU_LOG1("Warning: Dropped %lu bytes sending to %s\r\n", bytes_read - nwritten, out_port->nickname);
-                                }
-                            }
-                            else if (out_port->devaddr == uart_devaddr)
-                            {
-                                uint8_t npushed = midi_uart_write_tx_buffer(midi_uart_instance, buffer, bytes_read);
-                                if (npushed != bytes_read)
-                                {
-                                    TU_LOG1("Warning: Dropped %lu bytes sending to UART MIDI Out\r\n", bytes_read - npushed);
-                                }
-                            }
-                            else
-                            {
-                                uint32_t nwritten = tud_midi_stream_write(0, buffer, bytes_read);
-                                if (nwritten != bytes_read) {
-                                    TU_LOG1("Warning: Dropped %lu bytes sending to USB DEV MIDI OUT\r\n", bytes_read - nwritten);
-                                }
-                            }
-                        }
-                        else
-                        {
-                            TU_LOG1("skipping %s dev_addr=%u\r\n", out_port->nickname.c_str(), out_port->devaddr);
-                        }
-#endif
                         route_midi(out_port, buffer, bytes_read);
                     }
                     break; // found the right in_port; don't need to stay in the loop

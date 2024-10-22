@@ -178,18 +178,6 @@ private:
      * @param size the size of the packet in bytes
      */
     void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size);
-#if 0    
-    static void static_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size);
-
-    static const uint8_t APP_AD_FLAGS=0x06;
-    static constexpr uint8_t adv_data[]{
-        // Flags general discoverable
-        0x02, BLUETOOTH_DATA_TYPE_FLAGS, APP_AD_FLAGS,
-        // Service class list
-        0x11, BLUETOOTH_DATA_TYPE_COMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS, 0x00, 0xc7, 0xc4, 0x4e, 0xe3, 0x6c, 0x51, 0xa7, 0x33, 0x4b, 0xe8, 0xed, 0x5a, 0x0e, 0xb8, 0x03,
-    };
-    static const uint8_t adv_data_len = sizeof(adv_data);
-#endif
     uint8_t scan_resp_data[32];
     uint8_t scan_resp_data_len;
     //hci_con_handle_t con_handle;

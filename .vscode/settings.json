@@ -91,6 +91,20 @@
         "streambuf": "cpp",
         "thread": "cpp",
         "cinttypes": "cpp",
-        "variant": "cpp"
-    }
+        "variant": "cpp",
+        "irq.h": "c",
+        "ranges": "cpp",
+        "cstdbool": "cpp",
+        "compare": "cpp",
+        "concepts": "cpp",
+        "netfwd": "cpp",
+        "numbers": "cpp",
+        "stop_token": "cpp",
+        "assert.h": "c",
+        "ble_midi_pkt_codec.h": "c",
+        "ble_midi_client_stream_handler.h": "c"
+    },
+    "cmake.configureArgs": [
+        "-DPICO_BOARD=pico_w"
+    ]
 }

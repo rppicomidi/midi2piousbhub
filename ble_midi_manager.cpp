@@ -98,172 +98,6 @@ rppicomidi::BLE_MIDI_Manager::BLE_MIDI_Manager(const char* local_name) :
     }
 }
 
-#if 0
-void rppicomidi::BLE_MIDI_Manager::packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size)
-{
-    UNUSED(size);
-    UNUSED(channel);
-    bd_addr_t local_addr;
-    uint8_t event_type;
-    bd_addr_t addr;
-    bd_addr_type_t addr_type;
-    uint8_t status;
-    // setup advertisements
-    uint16_t adv_int_min = 800;
-    uint16_t adv_int_max = 800;
-    uint8_t adv_type = 0;
-    bd_addr_t null_addr;
-    switch(packet_type) {
-        case HCI_EVENT_PACKET:
-            event_type = hci_event_packet_get_type(packet);
-            switch(event_type){
-                case BTSTACK_EVENT_STATE:
-                    if (btstack_event_state_get_state(packet) != HCI_STATE_WORKING) {
-                        return;
-                    }
-                    gap_local_bd_addr(local_addr);
-                    printf("BTstack up and running on %s.\n", bd_addr_to_str(local_addr));
-
-                    memset(null_addr, 0, 6);
-                    gap_advertisements_set_params(adv_int_min, adv_int_max, adv_type, 0, null_addr, 0x07, 0x00);
-                    assert(adv_data_len <= 31); // ble limitation
-                    gap_advertisements_set_data(adv_data_len, (uint8_t*) adv_data);
-                    assert(scan_resp_data_len <= 31); // ble limitation
-                    gap_scan_response_set_data(scan_resp_data_len, (uint8_t*) scan_resp_data);
-                    gap_advertisements_enable(1);
-
-                    break;
-                case HCI_EVENT_DISCONNECTION_COMPLETE:
-                    printf("blem: HCI_EVENT_DISCONNECTION_COMPLETE event\r\n");
-                    con_handle = HCI_CON_HANDLE_INVALID;
-#if 0
-                    if (is_client && next_connect_bd_addr_type <= BD_ADDR_TYPE_LE_RANDOM_IDENTITY) {
-                        // honor pending connection request
-                        gap_connect(next_connect_bd_addr, next_connect_bd_addr_type);
-                    }
-#endif
-                    break;
-                case HCI_EVENT_GATTSERVICE_META:
-                    switch(hci_event_gattservice_meta_get_subevent_code(packet)) {
-                        case GATTSERVICE_SUBEVENT_SPP_SERVICE_CONNECTED:
-                            con_handle = gattservice_subevent_spp_service_connected_get_con_handle(packet);
-                            printf("blem: GATTSERVICE_SUBEVENT_SPP_SERVICE_CONNECTED event handle = %u\r\n", con_handle);
-                            break;
-                        case GATTSERVICE_SUBEVENT_SPP_SERVICE_DISCONNECTED:
-                            printf("blem: GATTSERVICE_SUBEVENT_SPP_SERVICE_DISCONNECTED event\r\n");
-                            con_handle = HCI_CON_HANDLE_INVALID;
-                            break;
-                        default:
-                            break;
-                    }
-                    break;
-                case SM_EVENT_JUST_WORKS_REQUEST:
-                    printf("blem: Just Works requested\n");
-                    sm_just_works_confirm(sm_event_just_works_request_get_handle(packet));
-                    break;
-                case SM_EVENT_NUMERIC_COMPARISON_REQUEST:
-                    printf("blem: Confirming numeric comparison: %" PRIu32 "\n", sm_event_numeric_comparison_request_get_passkey(packet));
-                    sm_numeric_comparison_confirm(sm_event_passkey_display_number_get_handle(packet));
-                    break;
-                case SM_EVENT_PASSKEY_DISPLAY_NUMBER:
-                    printf("blem: Display Passkey: %" PRIu32 "\n", sm_event_passkey_display_number_get_passkey(packet));
-                    break;
-                case SM_EVENT_IDENTITY_CREATED:
-                    sm_event_identity_created_get_identity_address(packet, addr);
-                    printf("blem: Identity created: type %u address %s\n", sm_event_identity_created_get_identity_addr_type(packet), bd_addr_to_str(addr));
-                    break;
-                case SM_EVENT_IDENTITY_RESOLVING_SUCCEEDED:
-                    sm_event_identity_resolving_succeeded_get_identity_address(packet, addr);
-                    printf("blem: Identity resolved: type %u address %s\n", sm_event_identity_resolving_succeeded_get_identity_addr_type(packet), bd_addr_to_str(addr));
-                    break;
-                case SM_EVENT_IDENTITY_RESOLVING_FAILED:
-                    sm_event_identity_created_get_address(packet, addr);
-                    printf("blem: Identity resolving failed\n");
-                    break;
-                case SM_EVENT_PAIRING_STARTED:
-                    printf("blem: Pairing started\n");
-                    break;
-                case SM_EVENT_PAIRING_COMPLETE:
-                    switch (sm_event_pairing_complete_get_status(packet)){
-                        case ERROR_CODE_SUCCESS:
-                            printf("blem: Pairing complete, success\n");
-                            break;
-                        case ERROR_CODE_CONNECTION_TIMEOUT:
-                            printf("blem: Pairing failed, timeout\n");
-                            break;
-                        case ERROR_CODE_REMOTE_USER_TERMINATED_CONNECTION:
-                            printf("blem: Pairing failed, disconnected\n");
-                            break;
-                        case ERROR_CODE_AUTHENTICATION_FAILURE:
-                            printf("blem: Pairing failed, authentication failure with reason = %u\n", sm_event_pairing_complete_get_reason(packet));
-                            break;
-                        default:
-                            break;
-                    }
-                    break;
-                case SM_EVENT_REENCRYPTION_STARTED:
-                    sm_event_reencryption_complete_get_address(packet, addr);
-                    printf("blem: Bonding information exists for addr type %u, identity addr %s -> re-encryption started\n",
-                        sm_event_reencryption_started_get_addr_type(packet), bd_addr_to_str(addr));
-                    break;
-                case SM_EVENT_REENCRYPTION_COMPLETE:
-                    switch (sm_event_reencryption_complete_get_status(packet)){
-                        case ERROR_CODE_SUCCESS:
-                            printf("blem: Re-encryption complete, success\n");
-                            break;
-                        case ERROR_CODE_CONNECTION_TIMEOUT:
-                            printf("blem: Re-encryption failed, timeout\n");
-                            break;
-                        case ERROR_CODE_REMOTE_USER_TERMINATED_CONNECTION:
-                            printf("blem: Re-encryption failed, disconnected\n");
-                            break;
-                        case ERROR_CODE_PIN_OR_KEY_MISSING:
-                            printf("blem: Re-encryption failed, bonding information missing\n\n");
-                            printf("Assuming remote lost bonding information\n");
-                            printf("Deleting local bonding information to allow for new pairing...\n");
-                            sm_event_reencryption_complete_get_address(packet, addr);
-                            addr_type = static_cast<bd_addr_type_t>(sm_event_reencryption_started_get_addr_type(packet));
-                            gap_delete_bonding(addr_type, addr);
-                            break;
-                        default:
-                            break;
-                    }
-                    break;
-                case GATT_EVENT_QUERY_COMPLETE:
-                    status = gatt_event_query_complete_get_att_status(packet);
-                    switch (status){
-                        case ATT_ERROR_INSUFFICIENT_ENCRYPTION:
-                            printf("blem: GATT Query failed, Insufficient Encryption\n");
-                            break;
-                        case ATT_ERROR_INSUFFICIENT_AUTHENTICATION:
-                            printf("blem: GATT Query failed, Insufficient Authentication\n");
-                            break;
-                        case ATT_ERROR_BONDING_INFORMATION_MISSING:
-                            printf("blem: GATT Query failed, Bonding Information Missing\n");
-                            break;
-                        case ATT_ERROR_SUCCESS:
-                            printf("blem: GATT Query successful\n");
-                            break;
-                        default:
-                            printf("blem: GATT Query failed, status 0x%02x\n", gatt_event_query_complete_get_att_status(packet));
-                            break;
-                    }
-                    break;
-                default:
-                    break;
-            } // event_type
-            break;
-        default:
-            break;
-    } // HCI_PACKET
-}
-
-void rppicomidi::BLE_MIDI_Manager::static_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size)
-{
-    instance->packet_handler(packet_type, channel, packet, size);
-}
-#endif
-
 bool rppicomidi::BLE_MIDI_Manager::init(BLE_MIDI_Manager* instance_, bool is_client_)
 {
     if (initialized) {
@@ -279,35 +113,6 @@ bool rppicomidi::BLE_MIDI_Manager::init(BLE_MIDI_Manager* instance_, bool is_cli
     {
         ble_midi_server_init(profile_data, scan_resp_data, scan_resp_data_len);
     }
-#if 0
-    con_handle = HCI_CON_HANDLE_INVALID;
-    printf("con_handle initialized\r\n");
-    // initialize CYW43 driver architecture (will enable BT if/because CYW43_ENABLE_BLUETOOTH == 1)
-    if (cyw43_arch_init()) {
-        printf("ble-midi2usbhost: failed to initialize cyw43_arch\n");
-        return false;
-    }
-    l2cap_init();
-
-    sm_init();
-
-    // just works, legacy pairing, with bonding
-    sm_set_io_capabilities(IO_CAPABILITY_NO_INPUT_NO_OUTPUT);
-    sm_set_authentication_requirements(SM_AUTHREQ_SECURE_CONNECTION | SM_AUTHREQ_BONDING);
-    // register for SM events
-    sm_event_callback_registration.callback = &static_packet_handler;
-    sm_add_event_handler(&sm_event_callback_registration);
-    if (is_client) {
-
-    }
-    else {
-        att_server_init(profile_data, NULL, NULL);
-        midi_service_stream_init(sm_event_callback_registration.callback);
-    }
-
-    // turn on bluetooth
-    hci_power_control(HCI_POWER_ON);
-#endif
     initialized = true;
     return true;
 }
@@ -320,22 +125,6 @@ void rppicomidi::BLE_MIDI_Manager::deinit()
         ble_midi_client_deinit();
     else
         ble_midi_server_deinit();
-#if 0
-    hci_power_control(HCI_POWER_OFF);
-    sm_remove_event_handler(&sm_event_callback_registration);
-    if (is_client) {
-        ble_midi_client_scan_end();
-    }
-    else {
-        att_server_deinit();
-    }
-
-    sm_deinit();
-    l2cap_deinit();
-    cyw43_arch_deinit();
-    con_handle = HCI_CON_HANDLE_INVALID;
-    printf("con_handle deinit\r\n");
-#endif
     initialized = false;
 }
 
@@ -437,4 +226,4 @@ void rppicomidi::BLE_MIDI_Manager::scan_begin()
     initialized = true;
 }
 
-#endif
+#endif // ifdef RPPICOMIDI_PICO_W

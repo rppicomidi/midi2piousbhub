@@ -102,24 +102,25 @@ python tools/get_deps.py rp2040
 ```
 For more information, see the [TinyUSB documentation](https://docs.tinyusb.org/en/latest/reference/getting_started.html#dependencies)
 
-## Pico W Users: Update the PIO USB Driver to use only PIO 0
+## Update the PIO USB Driver to fix memory corruption
 Until version 0.6.0, the [Pico-PIO-USB](https://github.com/sekigon-gonnoc/Pico-PIO-USB) project consumed
-most of the 32 PIO 0 instructions and all of the PIO 1 instructions. Version 0.6.0
+most of the 32 PIO 0 instructions and all of the PIO 1 instructions. Version 0.6.0 and later
 only uses PIO 0. The CYW43 Bluetooth radio module on the Pico W communicates
 with the Pico W's RP2040 chip via a custom SPI driver implemented in PIO 1.
 Before version Pico-PIO-USB version 0.6.0, I found that the Pico W CYW43 SPI PIO driver
 would lock up from time to time if both PIO USB was active and there was a lot
 of data transfer between the CYW43 module and the RP2040 (such as during Bluetooth
 LE client mode active scanning). Switching to version 0.6.0 seems to have fixed
-the issue.
+most of that issue. However, version 0.6.1 fixed a memory corruption issue, so
+it is better to have that one or later.
 
-To get version Pico-PIO-USB 0.6.0 into your TinyUSB library, make sure you first
+To get version Pico-PIO-USB 0.6.1 into your TinyUSB library, make sure you first
 installed PIO USB support for TinyUSB as described in the previous section.
 Then type the following instructions at a command prompt:
 ```
 cd ${PICO_SDK_PATH}/lib/tinyusb/hw/mcu/raspberry_pi/Pico-PIO-USB
 git pull
-git checkout 0.6.0
+git checkout 0.6.1
 ```
 
 ## Get the project code
