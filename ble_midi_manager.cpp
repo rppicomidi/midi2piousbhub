@@ -79,7 +79,7 @@
 #include "ble_midi_profile.h"
 rppicomidi::BLE_MIDI_Manager* rppicomidi::BLE_MIDI_Manager::instance=nullptr;
 
-rppicomidi::BLE_MIDI_Manager::BLE_MIDI_Manager(const char* local_name) : con_handle{HCI_CON_HANDLE_INVALID},
+rppicomidi::BLE_MIDI_Manager::BLE_MIDI_Manager(const char* local_name) :
     is_client{false}, initialized{false}, is_scan_mode{false}
 {
     size_t local_name_len = strlen(local_name);
@@ -92,8 +92,13 @@ rppicomidi::BLE_MIDI_Manager::BLE_MIDI_Manager(const char* local_name) : con_han
     scan_resp_data[0] = local_name_len+1;
     memcpy(scan_resp_data+2, local_name, local_name_len);
     scan_resp_data_len = local_name_len+2;
+    if (cyw43_arch_init()) {
+        printf("ble-midi2usbhost: failed to initialize cyw43_arch\n");
+        assert(false);
+    }
 }
 
+#if 0
 void rppicomidi::BLE_MIDI_Manager::packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size)
 {
     UNUSED(size);
@@ -253,26 +258,28 @@ void rppicomidi::BLE_MIDI_Manager::packet_handler(uint8_t packet_type, uint16_t 
     } // HCI_PACKET
 }
 
-
 void rppicomidi::BLE_MIDI_Manager::static_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size)
 {
     instance->packet_handler(packet_type, channel, packet, size);
 }
+#endif
 
 bool rppicomidi::BLE_MIDI_Manager::init(BLE_MIDI_Manager* instance_, bool is_client_)
 {
     if (initialized) {
-        deinit(is_client);
-        initialized = false;
+        deinit();
     }
     is_client = is_client_;
     instance = instance_;
     if (is_client) {
         const char client_name[]="Pico W MIDI USB BLE Hub";
-        ble_midi_client_init(&static_packet_handler, client_name, strlen(client_name));
-        return true;
+        ble_midi_client_init(client_name, strlen(client_name));
     }
-
+    else
+    {
+        ble_midi_server_init(profile_data, scan_resp_data, scan_resp_data_len);
+    }
+#if 0
     con_handle = HCI_CON_HANDLE_INVALID;
     printf("con_handle initialized\r\n");
     // initialize CYW43 driver architecture (will enable BT if/because CYW43_ENABLE_BLUETOOTH == 1)
@@ -300,15 +307,20 @@ bool rppicomidi::BLE_MIDI_Manager::init(BLE_MIDI_Manager* instance_, bool is_cli
 
     // turn on bluetooth
     hci_power_control(HCI_POWER_ON);
+#endif
     initialized = true;
     return true;
 }
 
-void rppicomidi::BLE_MIDI_Manager::deinit(bool is_client)
+void rppicomidi::BLE_MIDI_Manager::deinit()
 {
     if (!initialized)
         return; // nothing to do
-
+    if (is_client)
+        ble_midi_client_deinit();
+    else
+        ble_midi_server_deinit();
+#if 0
     hci_power_control(HCI_POWER_OFF);
     sm_remove_event_handler(&sm_event_callback_registration);
     if (is_client) {
@@ -321,9 +333,10 @@ void rppicomidi::BLE_MIDI_Manager::deinit(bool is_client)
     sm_deinit();
     l2cap_deinit();
     cyw43_arch_deinit();
-    initialized = false;
     con_handle = HCI_CON_HANDLE_INVALID;
     printf("con_handle deinit\r\n");
+#endif
+    initialized = false;
 }
 
 uint8_t rppicomidi::BLE_MIDI_Manager::stream_read(uint8_t* bytes, uint8_t max_bytes)
@@ -331,9 +344,9 @@ uint8_t rppicomidi::BLE_MIDI_Manager::stream_read(uint8_t* bytes, uint8_t max_by
     uint16_t timestamp;
     if (is_connected()) {
         if (is_client)
-            return ble_midi_client_stream_read(con_handle, max_bytes, bytes, &timestamp);
+            return ble_midi_client_stream_read(max_bytes, bytes, &timestamp);
         else
-            return midi_service_stream_read(con_handle, max_bytes, bytes, &timestamp);
+            return ble_midi_server_stream_read(max_bytes, bytes, &timestamp);
     }
     return 0;
 }
@@ -342,10 +355,10 @@ uint8_t rppicomidi::BLE_MIDI_Manager::stream_write(const uint8_t* bytes, uint8_t
 {
     if (is_connected()) {
         if (is_client) {
-            return ble_midi_client_stream_write(con_handle, num_bytes, bytes);
+            return ble_midi_client_stream_write(num_bytes, bytes);
         }
         else {
-            return midi_service_stream_write(con_handle, num_bytes, bytes);
+            return ble_midi_server_stream_write(num_bytes, bytes);
         }
     }
     return 0;
@@ -356,10 +369,11 @@ void rppicomidi::BLE_MIDI_Manager::disconnect()
     //next_connect_bd_addr_type = BD_ADDR_TYPE_UNKNOWN;
     if (is_connected()) {
         if (is_client) {
-            ble_midi_client_request_disconnect(con_handle);
+            ble_midi_client_request_disconnect();
         }
         else {
-            gap_disconnect(con_handle);
+            //gap_disconnect(con_handle);
+            ble_midi_server_request_disconnect();
         }
     }
 }
@@ -414,9 +428,8 @@ void rppicomidi::BLE_MIDI_Manager::delete_le_bonding_info(int idx)
 void rppicomidi::BLE_MIDI_Manager::scan_begin()
 {    
     if (!is_client) {
-        deinit(is_client);
-        const char client_name[]="Pico W MIDI USB BLE Hub";
-        ble_midi_client_init(&static_packet_handler, client_name, strlen(client_name));
+        deinit();
+        init(this, true);
     }
     ble_midi_client_scan_begin();
     is_scan_mode = true;

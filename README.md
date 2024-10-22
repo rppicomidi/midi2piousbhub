@@ -2,7 +2,8 @@
 Use a Raspberry Pi Pico to interconnect a MIDI host, a serial MIDI device and
 up to 4 MIDI devices via a USB hub. If you have a Pico W or compatible board,
 this project supports connection from a Bluetooth MIDI client (iPad, phone,
-PC...)
+PC...) or connection to a Bluetooth MIDI server (Bluetooth MIDI Keyboard,
+control surface, etc.)
 
 This project uses the RP2040 processor's built-in USB port as a USB device
 port for connection to a USB MIDI host like a PC or Mac. It uses the RP2040's
@@ -20,8 +21,6 @@ the midi2piousbhub software will automatically reload the last saved preset on s
 and when you plug a Connected MIDI Device to the hub. You can back up any or all of
 your presets to a USB Flash drive connected to the USB hub. Presets are stored in
 JSON format. 
-
-# Project Status
 
 # Hardware
 My first test circuit used a Raspberry Pi Pico board, a USB A breakout board,
@@ -364,3 +363,28 @@ msc-rp2040rtc library.
 
 ## btmidi-disconnect
 Disconnect an active Bluetooth MIDI connection or report "Already disconnected."
+You must enter this command before switching between client mode and server mode
+if Bluetooth MIDI was previously connected.
+
+## btmidi-list
+List all Bluetooth bonded devices stored in the Bluetooth database
+
+## btmidi-rm
+Remove the device specified by the index from the Bluetooth bonded database
+
+## btmidi-client-scan-begin
+Start a scan for MIDI devices. Switch to client mode if necessary.
+
+## btmidi-client-scan-list
+List all found Bluetooth MIDI devices discovered during scan.
+
+## btmidi-client-scan-end
+End scan for Bluetooth MIDI devices and list all found
+
+## btmidi-client-connect <0 for last connected or index number from scan list>
+Connect to the specfied device index number from the scan list. Index 0 is the
+last connected device. TODO: right now this is the first device in the bonded
+device list.
+
+## btmidi-server-start
+Leave client mode and enter server mode.

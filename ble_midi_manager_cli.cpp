@@ -52,7 +52,7 @@ rppicomidi::BLE_MIDI_Manager_cli::BLE_MIDI_Manager_cli(EmbeddedCli* cli_, BLE_MI
     });
     assert(result);
     result = embeddedCliAddBinding(cli, {
-        "btmidi-scan-begin",
+        "btmidi-client-scan-begin",
         "start a scan for MIDI devices",
         false,
         blem_,
@@ -60,7 +60,7 @@ rppicomidi::BLE_MIDI_Manager_cli::BLE_MIDI_Manager_cli(EmbeddedCli* cli_, BLE_MI
     });
     assert(result);
     result = embeddedCliAddBinding(cli, {
-        "btmidi-scan-list",
+        "btmidi-client-scan-list",
         "list all found MIDI devices",
         false,
         blem_,
@@ -68,7 +68,7 @@ rppicomidi::BLE_MIDI_Manager_cli::BLE_MIDI_Manager_cli(EmbeddedCli* cli_, BLE_MI
     });
     assert(result);
     result = embeddedCliAddBinding(cli, {
-        "btmidi-scan-end",
+        "btmidi-client-scan-end",
         "end scan for MIDI devices and list all found",
         false,
         blem_,
@@ -83,7 +83,14 @@ rppicomidi::BLE_MIDI_Manager_cli::BLE_MIDI_Manager_cli(EmbeddedCli* cli_, BLE_MI
         static_client_connect
     });
     assert(result);
-
+    result = embeddedCliAddBinding(cli, {
+        "btmidi-server-start",
+        "leave client mode and enter server mode",
+        true,
+        blem_,
+        static_start_server
+    });
+    assert(result);
     (void)result;
 }
 
@@ -135,16 +142,31 @@ void rppicomidi::BLE_MIDI_Manager_cli::static_scan_list(EmbeddedCli *, char *, v
     ble_midi_client_dump_midi_peripherals();
 }
 
-void rppicomidi::BLE_MIDI_Manager_cli::static_client_connect(EmbeddedCli *, char *args, void *)
+void rppicomidi::BLE_MIDI_Manager_cli::static_client_connect(EmbeddedCli *, char *args, void *context)
 {
-    //auto blem = reinterpret_cast<BLE_MIDI_Manager*>(context);
+    auto blem = reinterpret_cast<BLE_MIDI_Manager*>(context);
     if (embeddedCliGetTokenCount(args) != 1) {
         printf("blmidi-client-connect <0 for last connected or index number from scan list>\r\n");
         return;
     }
+    if (blem->is_server_mode())
+        blem->init(blem, true);
     uint8_t idx = std::atoi(embeddedCliGetToken(args, 1));
     if (!ble_midi_client_request_connect(idx)) {
         printf("could not connect to index==%u\r\n", idx);
     }
+}
+
+void rppicomidi::BLE_MIDI_Manager_cli::static_start_server(EmbeddedCli *, char *args, void *context)
+{
+     if (embeddedCliGetTokenCount(args) != 0) {
+        printf("blmidi-start-server\r\n");
+        return;
+    }
+    auto blem = reinterpret_cast<BLE_MIDI_Manager*>(context);
+    if (blem->is_server_mode()) {
+        printf("already in server mode\r\n");
+    }
+    blem->init(blem, false);
 }
 #endif

@@ -688,7 +688,7 @@ int main()
     }
     rppicomidi::Midi2PioUsbhub &instance = rppicomidi::Midi2PioUsbhub::instance();
 #if RPPICOMIDI_PICO_W
-    if (!instance.blem_init(true)) {
+    if (!instance.blem_init(false)) {
         printf("Error starting up Bluetooth Module\r\nProgam stalled\r\n");
         for (;;) {
             tight_loop_contents();

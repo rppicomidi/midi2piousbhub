@@ -76,7 +76,7 @@
 #include "btstack.h"
 #include "pico/cyw43_arch.h"
 #include "pico/btstack_cyw43.h"
-#include "midi_service_stream_handler.h"
+#include "ble_midi_server.h"
 #include "ble_midi_client.h"
 
 namespace rppicomidi
@@ -112,13 +112,16 @@ public:
      */
     bool init(BLE_MIDI_Manager* instance_, bool is_client_);
 
-    void deinit(bool is_client);
+    /**
+     * @brief De-initialize the Bluetooth system
+     */
+    void deinit();
     /**
      * @brief see if the Bluetooth LE MIDI device is connected
      * 
      * @return true if connected, false otherwise.
      */
-    bool is_connected() {return con_handle != HCI_CON_HANDLE_INVALID;}
+    bool is_connected() {if (is_client) return ble_midi_client_is_connected(); else return ble_midi_server_is_connected(); }
 
     /**
      * @brief read a MIDI stream from the connected Bluetooth LE MIDI device
@@ -163,6 +166,8 @@ public:
      * 
      */
     void scan_begin();
+
+    bool is_server_mode() {return !is_client; }
 private:
     /**
      * @brief called by static_packet_handler to handle BT Stack messages
@@ -173,6 +178,7 @@ private:
      * @param size the size of the packet in bytes
      */
     void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size);
+#if 0    
     static void static_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size);
 
     static const uint8_t APP_AD_FLAGS=0x06;
@@ -183,9 +189,10 @@ private:
         0x11, BLUETOOTH_DATA_TYPE_COMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS, 0x00, 0xc7, 0xc4, 0x4e, 0xe3, 0x6c, 0x51, 0xa7, 0x33, 0x4b, 0xe8, 0xed, 0x5a, 0x0e, 0xb8, 0x03,
     };
     static const uint8_t adv_data_len = sizeof(adv_data);
+#endif
     uint8_t scan_resp_data[32];
     uint8_t scan_resp_data_len;
-    hci_con_handle_t con_handle;
+    //hci_con_handle_t con_handle;
     bool is_client;
     bool initialized;
     bool is_scan_mode;

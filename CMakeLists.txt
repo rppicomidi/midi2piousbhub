@@ -63,7 +63,7 @@ target_include_directories(${target_proj} PRIVATE
     )
 target_link_libraries(${target_proj}
   pico_cyw43_arch_none
-  ble_midi_service_lib
+  ble_midi_server_lib
   ble_midi_client_lib
   pico_btstack_cyw43
 )
