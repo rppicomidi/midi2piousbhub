@@ -105,13 +105,20 @@ bool rppicomidi::BLE_MIDI_Manager::init(BLE_MIDI_Manager* instance_, bool is_cli
     }
     is_client = is_client_;
     instance = instance_;
+    // pairing request will display a numeric match value if the other end has a display too.
     if (is_client) {
         const char client_name[]="Pico W MIDI USB BLE Hub";
-        ble_midi_client_init(client_name, strlen(client_name));
+        ble_midi_client_init(client_name, strlen(client_name),
+            IO_CAPABILITY_DISPLAY_ONLY,
+            SM_AUTHREQ_SECURE_CONNECTION | SM_AUTHREQ_MITM_PROTECTION | SM_AUTHREQ_BONDING
+        );
     }
     else
     {
-        ble_midi_server_init(profile_data, scan_resp_data, scan_resp_data_len);
+        ble_midi_server_init(profile_data, scan_resp_data, scan_resp_data_len,
+            IO_CAPABILITY_DISPLAY_ONLY,
+            SM_AUTHREQ_SECURE_CONNECTION | SM_AUTHREQ_MITM_PROTECTION | SM_AUTHREQ_BONDING
+        );
     }
     initialized = true;
     return true;
