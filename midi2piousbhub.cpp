@@ -485,6 +485,7 @@ rppicomidi::Midi2PioUsbhub::Midi2PioUsbhub() : blem{"Pico W MIDI USB BLE Hub"}, 
 rppicomidi::Midi2PioUsbhub::Midi2PioUsbhub() : cli{&preset_manager}
 #endif
 {
+    preset_loaded = false;
     bi_decl(bi_program_description("Provide a USB host interface for Serial Port MIDI."));
     bi_decl(bi_1pin_with_name(LED_GPIO, "On-board LED"));
     bi_decl(bi_2pins_with_names(MIDI_UART_TX_GPIO, "MIDI UART TX", MIDI_UART_RX_GPIO, "MIDI UART RX"));
@@ -632,6 +633,25 @@ void rppicomidi::Midi2PioUsbhub::task()
 
 
     cli.task();
+
+    if (!preset_loaded)
+    {
+        absolute_time_t now = get_absolute_time();
+
+        int64_t diff = absolute_time_diff_us(previous_timestamp, now);
+
+        if (diff > 1000000ll) {
+          std::string current;
+          preset_manager.get_current_preset_name(current);
+          if (!current.empty())
+            {
+                preset_manager.load_preset(current);
+            }
+            // We tried to load, if it failed we do not retry
+            preset_loaded = true;
+        }
+    }
+
     if (cli_up_message_pending)
     {
         absolute_time_t now = get_absolute_time();

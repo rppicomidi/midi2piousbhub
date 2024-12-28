@@ -227,5 +227,6 @@ namespace rppicomidi
         #endif
         Midi2PioUsbhub_cli cli;
         bool cdc_state_has_changed;
+        bool preset_loaded;
     };
 }
