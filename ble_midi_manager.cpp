@@ -149,15 +149,19 @@ uint8_t rppicomidi::BLE_MIDI_Manager::stream_read(uint8_t* bytes, uint8_t max_by
 
 uint8_t rppicomidi::BLE_MIDI_Manager::stream_write(const uint8_t* bytes, uint8_t num_bytes)
 {
+    uint8_t result = 0;
     if (is_connected()) {
+        auto context = cyw43_arch_async_context();
+        async_context_acquire_lock_blocking(context);
         if (is_client) {
-            return ble_midi_client_stream_write(num_bytes, bytes);
+            result = ble_midi_client_stream_write(num_bytes, bytes);
         }
         else {
-            return ble_midi_server_stream_write(num_bytes, bytes);
+            result = ble_midi_server_stream_write(num_bytes, bytes);
         }
+        async_context_release_lock(context);
     }
-    return 0;
+    return result;
 }
 
 void rppicomidi::BLE_MIDI_Manager::disconnect()
