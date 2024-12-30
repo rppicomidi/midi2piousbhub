@@ -121,7 +121,7 @@ public:
      * 
      * @return true if connected, false otherwise.
      */
-    bool is_connected() {if (is_client) return ble_midi_client_is_connected(); else return ble_midi_server_is_connected(); }
+    bool is_connected() {if (is_client) return ble_midi_client_is_ready(); else return ble_midi_server_is_connected(); }
 
     /**
      * @brief read a MIDI stream from the connected Bluetooth LE MIDI device

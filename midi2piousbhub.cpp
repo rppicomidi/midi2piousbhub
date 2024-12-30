@@ -619,9 +619,18 @@ void rppicomidi::Midi2PioUsbhub::task()
     tud_task();
 
     poll_midi_uart_rx();
+    // TinyUSB provides no mounted callback for USB MIDI devices
+    bool prev_configured = attached_devices[usbdev_devaddr].configured;
     attached_devices[usbdev_devaddr].configured = tud_midi_mounted();
+    if (attached_devices[usbdev_devaddr].configured && !prev_configured) {
+        load_current_preset();
+    }
 #ifdef RPPICOMIDI_PICO_W
+    prev_configured = attached_devices[ble_devaddr].configured;
     attached_devices[ble_devaddr].configured = blem.is_connected();
+    if (attached_devices[ble_devaddr].configured && !prev_configured) {
+        load_current_preset();
+    }
 #endif
     poll_midi_usbdev_rx();
 #ifdef RPPICOMIDI_PICO_W
@@ -649,6 +658,16 @@ void rppicomidi::Midi2PioUsbhub::task()
         cdc_state_has_changed = false;
         cli_up_message_pending = tud_cdc_connected();
         previous_timestamp = get_absolute_time();
+    }
+}
+
+
+void rppicomidi::Midi2PioUsbhub::load_current_preset()
+{
+    std::string current;
+    instance().preset_manager.get_current_preset_name(current);
+    if (current.length() < 1 || !instance().preset_manager.load_preset(current)) {
+        printf("current preset load failed.\r\n");
     }
 }
 
@@ -704,6 +723,7 @@ void get_info_from_default_nickname(std::string nickname, uint16_t &vid, uint16_
     is_from = nickname.substr(9, 1) == "F";
 }
 
+
 //--------------------------------------------------------------------+
 // TinyUSB Callbacks
 //--------------------------------------------------------------------+
@@ -742,11 +762,7 @@ void rppicomidi::Midi2PioUsbhub::prod_str_cb(tuh_xfer_t *xfer)
                                                  midi_out->cable, false);
             }
         }
-        std::string current;
-        instance().preset_manager.get_current_preset_name(current);
-        if (current.length() < 1 || !instance().preset_manager.load_preset(current)) {
-            printf("current preset load failed.\r\n");
-        }
+        instance().load_current_preset();
         devinfo->configured = true;
     }
 }

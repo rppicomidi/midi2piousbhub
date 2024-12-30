@@ -194,6 +194,7 @@ namespace rppicomidi
 
         static void langid_cb(tuh_xfer_t *xfer);
         static void prod_str_cb(tuh_xfer_t *xfer);
+        void load_current_preset();
         // UART selection Pin mapping. You can move these for your design if you want to
         // Make sure all these values are consistent with your choice of midi_uart
         static const uint MIDI_UART_NUM = 1;
