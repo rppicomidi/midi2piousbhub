@@ -124,6 +124,23 @@ public:
     bool is_connected() {if (is_client) return ble_midi_client_is_ready(); else return ble_midi_server_is_connected(); }
 
     /**
+     * @brief Get BDADDR and type of the last connected BLE MIDI server
+     *
+     * @param addr points to the 6 bytes to store the BDADDR (not modified if return value is BD_ADDR_TYPE_UNKNOWN)
+     * @return BD_ADDR_TYPE_UNKNOWN if not client mode or if last connected was never set. Otherwise, return the address type
+     */
+    int get_last_connected(uint8_t* addr) {if (is_client) return ble_midi_client_get_last_conntected(addr); return BD_ADDR_TYPE_UNKNOWN; }
+
+    /**
+     * @brief Set the BDADDR and type of the last connected BLE MIDI server
+     *
+     * @param addr_type is the BDADDR type of the last connected
+     * @param addr points to the 6-byte BDADDR of the lastt connected BLE MIDI server
+     * @return true if in client mode, false in server mode.
+     */
+    bool set_last_connected(int addr_type, uint8_t addr[6]) {if (!is_client) return false; ble_midi_client_set_last_connected(addr_type, addr); return true; }
+
+    /**
      * @brief read a MIDI stream from the connected Bluetooth LE MIDI device
      * 
      * @param bytes the buffer to hold the bytes read

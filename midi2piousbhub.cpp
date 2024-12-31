@@ -630,6 +630,9 @@ void rppicomidi::Midi2PioUsbhub::task()
     attached_devices[ble_devaddr].configured = blem.is_connected();
     if (attached_devices[ble_devaddr].configured && !prev_configured) {
         load_current_preset();
+        uint8_t addr[6];
+        int addr_type = blem.get_last_connected(addr);
+        printf("TODO: store addr_type=%d %s\r\n", addr_type, bd_addr_to_str(addr));
     }
 #endif
     poll_midi_usbdev_rx();
