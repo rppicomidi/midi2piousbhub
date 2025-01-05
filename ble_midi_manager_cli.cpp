@@ -24,6 +24,7 @@
  */
 #ifdef RPPICOMIDI_PICO_W
 #include "ble_midi_manager_cli.h"
+#include "midi2piousbhub.h"
 #include "pico/assert.h"
 rppicomidi::BLE_MIDI_Manager_cli::BLE_MIDI_Manager_cli(EmbeddedCli* cli_, BLE_MIDI_Manager* blem_) : cli{cli_}
 {
@@ -91,6 +92,14 @@ rppicomidi::BLE_MIDI_Manager_cli::BLE_MIDI_Manager_cli(EmbeddedCli* cli_, BLE_MI
         static_start_server
     });
     assert(result);
+    result = embeddedCliAddBinding(cli, {
+        "btmidi-client-auto-connect",
+        "blmidi-client-auto-connect <0 to disable , 1 to set auto-connect to current server>",
+        true,
+        blem,
+        static_client_auto_connect
+    });
+    assert(result);
     (void)result;
 }
 
@@ -154,6 +163,38 @@ void rppicomidi::BLE_MIDI_Manager_cli::static_client_connect(EmbeddedCli *, char
     uint8_t idx = std::atoi(embeddedCliGetToken(args, 1));
     if (!ble_midi_client_request_connect(idx)) {
         printf("could not connect to index==%u\r\n", idx);
+    }
+}
+
+void rppicomidi::BLE_MIDI_Manager_cli::static_client_auto_connect(EmbeddedCli *, char *args, void *context)
+{
+    auto blem = reinterpret_cast<BLE_MIDI_Manager*>(context);
+    if (embeddedCliGetTokenCount(args) != 1) {
+        printf("blmidi-client-auto-connect <0 to disable , 1 to set auto-connect to current server>\r\n");
+        return;
+    }
+    uint8_t set = std::atoi(embeddedCliGetToken(args, 1));
+    if (set > 1) {
+        printf("invalid argument %u\r\n", set);
+        return;
+    }
+    if (blem->is_connected()) {
+      uint8_t addr[6];
+      int result = blem->get_last_connected(addr);
+      if (result == BD_ADDR_TYPE_UNKNOWN) {
+          printf("couldn't get the address of the last device\r\n");
+          return;
+      }
+      // Convert addr to a string of hex digits
+      char addr_str[13];
+      for (int i = 0; i < 6; i++) {
+          sprintf(&addr_str[i*2], "%02x", addr[i]);
+      }
+      Midi2PioUsbhub::instance().set_auto_connect(std::string(addr_str));
+        printf("TODO: implement static_client_auto_connect");
+
+    } else {
+        printf("You need to connect first\r\n");
     }
 }
 

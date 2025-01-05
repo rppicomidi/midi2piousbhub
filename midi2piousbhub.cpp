@@ -163,6 +163,10 @@ void rppicomidi::Midi2PioUsbhub::serialize(std::string &serialized_string)
     }
     json_object_set_value(root_object, "routing", routing_value);
 
+    if (!auto_connect_address.empty()) {
+        json_object_set_string(root_object, "bt-auto-connect", auto_connect_address.c_str());
+    }
+
     auto ser = json_serialize_to_string(root_value);
     serialized_string = std::string(ser);
     json_free_serialized_string(ser);
@@ -267,6 +271,22 @@ bool rppicomidi::Midi2PioUsbhub::deserialize(std::string &serialized_string)
         json_value_free(root_value);
         return false;
     }
+
+    JSON_Value* auto_connect_address_value = json_object_get_value(root_object, "bt-auto-connect");
+    if (auto_connect_address_value == nullptr) {
+      	auto_connect_address.clear();
+    } else {
+		const char* address = json_value_get_string(auto_connect_address_value);
+
+        if (address) {
+            auto_connect_address = std::string(address);
+        } else {
+            // Poorly formatted JSON
+            json_value_free(root_value);
+            return false;
+        }
+    }
+
     json_value_free(root_value);
     return true;
 }

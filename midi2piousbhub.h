@@ -157,6 +157,8 @@ namespace rppicomidi
          */
         int disconnect(const std::string& from_nickname, const std::string& to_nickname);
 
+        void set_auto_connect(const std::string &address) { auto_connect_address = address; }
+
         /**
          * @brief clear all MIDI stream connections
          *
@@ -216,6 +218,7 @@ namespace rppicomidi
 
         std::vector<Midi_out_port *> midi_out_port_list;
         std::vector<Midi_in_port *> midi_in_port_list;
+        std::string auto_connect_address;
 
         Midi_in_port uart_midi_in_port;
         Midi_out_port uart_midi_out_port;
