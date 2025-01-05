@@ -35,7 +35,7 @@ rppicomidi::Preset_manager_cli::Preset_manager_cli(EmbeddedCli* cli, Preset_mana
         static_load_preset
     });
     assert(result);
-    embeddedCliAddBinding(cli, {
+    result = embeddedCliAddBinding(cli, {
         "save",
         "save the current configuration as a preset. usage: save <preset name>",
         true,

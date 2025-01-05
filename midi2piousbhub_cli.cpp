@@ -303,7 +303,6 @@ void rppicomidi::Midi2PioUsbhub_cli::static_rename(EmbeddedCli *cli, char *args,
     }
 }
 
-
 // Invoked when cdc when line state changed e.g connected/disconnected
 void tud_cdc_line_state_cb(uint8_t itf, bool dtr, bool rts)
 {

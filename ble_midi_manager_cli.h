@@ -47,6 +47,7 @@ private:
     static void static_scan_end(EmbeddedCli *, char *, void *);
     static void static_scan_list(EmbeddedCli *, char *, void *);
     static void static_client_connect(EmbeddedCli *, char *, void *);
+    static void static_client_auto_connect(EmbeddedCli *, char *, void *);
     static void static_start_server(EmbeddedCli *, char *, void *);
     // data
     EmbeddedCli* cli;
