@@ -127,22 +127,22 @@ void rppicomidi::Midi2PioUsbhub_cli::static_list(EmbeddedCli *, char *, void *)
     for (size_t addr = 1; addr <= CFG_TUH_DEVICE_MAX + 3; addr++)
     {
         auto dev = Midi2PioUsbhub::instance().get_attached_device(addr);
-        if (dev && dev->configured)
+        if (dev && (dev->configured || addr > CFG_TUH_DEVICE_MAX))
         {
             // printf("%04x-%04x    %d      %s    %s %s\r\n", dev.vid, dev.pid, 1, "FROM", "0944-0117-1 ", dev.product_name.c_str());
             for (auto in_port : Midi2PioUsbhub::instance().get_midi_in_port_list())
             {
                 if (in_port->devaddr == addr)
                 {
-                    printf("%04x-%04x    %-2d     %s    %-12s %s\r\n", dev->vid, dev->pid, in_port->cable + 1,
-                           "FROM", in_port->nickname.c_str(), dev->product_name.c_str());
+                    printf("%04x-%04x    %-2d     %s    %-12s %s%s\r\n", dev->vid, dev->pid, in_port->cable + 1,
+                           "FROM", in_port->nickname.c_str(), dev->product_name.c_str(), dev->configured?"":" (Disconnected)");
                     for (auto out_port : Midi2PioUsbhub::instance().get_midi_out_port_list())
                     {
                         if (out_port->devaddr == addr && out_port->cable == in_port->cable)
                         {
-                            printf("%04x-%04x    %-2d     %s    %-12s %s\r\n", dev->vid, dev->pid,
+                            printf("%04x-%04x    %-2d     %s    %-12s %s%s\r\n", dev->vid, dev->pid,
                                    out_port->cable + 1,
-                                   " TO ", out_port->nickname.c_str(), dev->product_name.c_str());
+                                   " TO ", out_port->nickname.c_str(), dev->product_name.c_str(), dev->configured?"":" (Disconnected)");
                             break;
                         }
                     }
@@ -225,7 +225,7 @@ void rppicomidi::Midi2PioUsbhub_cli::static_show(EmbeddedCli *, char *, void *)
 
         for (auto midi_out : Midi2PioUsbhub::instance().get_midi_out_port_list())
         {
-            if (!Midi2PioUsbhub::instance().is_device_configured(midi_out->devaddr))
+            if (midi_out->devaddr <= CFG_TUH_DEVICE_MAX && !Midi2PioUsbhub::instance().is_device_configured(midi_out->devaddr))
                 continue;
             size_t first_idx = line;
             if (midi_out->nickname.length() < 12)
@@ -242,25 +242,29 @@ void rppicomidi::Midi2PioUsbhub_cli::static_show(EmbeddedCli *, char *, void *)
     printf("------------+");
     for (size_t col = 0; col < Midi2PioUsbhub::instance().get_midi_out_port_list().size(); col++)
     {
-        if (Midi2PioUsbhub::instance().is_device_configured(Midi2PioUsbhub::instance().get_midi_out_port_list().at(col)->devaddr))
+        uint8_t devaddr = Midi2PioUsbhub::instance().get_midi_out_port_list().at(col)->devaddr;
+        if (devaddr > CFG_TUH_DEVICE_MAX || Midi2PioUsbhub::instance().is_device_configured(devaddr))
             printf("---+");
     }
     printf("\r\n");
     for (auto midi_in : Midi2PioUsbhub::instance().get_midi_in_port_list())
     {
-        if (!Midi2PioUsbhub::instance().is_device_configured(midi_in->devaddr))
+        if (midi_in->devaddr <= CFG_TUH_DEVICE_MAX && !Midi2PioUsbhub::instance().is_device_configured(midi_in->devaddr))
             continue;
         printf("%-12s|", midi_in->nickname.c_str());
         for (auto midi_out : Midi2PioUsbhub::instance().get_midi_out_port_list())
         {
-            if (!Midi2PioUsbhub::instance().is_device_configured(midi_out->devaddr))
+            if (midi_out->devaddr < CFG_TUH_DEVICE_MAX && !Midi2PioUsbhub::instance().is_device_configured(midi_out->devaddr))
                 continue;
             char connection_mark = ' ';
             for (auto &sends_to : midi_in->sends_data_to_list)
             {
                 if (sends_to == midi_out)
                 {
-                    connection_mark = 'x';
+                    if (Midi2PioUsbhub::instance().is_device_configured(midi_in->devaddr) && Midi2PioUsbhub::instance().is_device_configured(midi_out->devaddr))
+                        connection_mark = 'x';
+                    else
+                        connection_mark = '!';
                 }
             }
             printf(" %c |", connection_mark);
@@ -268,9 +272,10 @@ void rppicomidi::Midi2PioUsbhub_cli::static_show(EmbeddedCli *, char *, void *)
         printf("\r\n------------+");
         for (size_t col = 0; col < Midi2PioUsbhub::instance().get_midi_out_port_list().size(); col++)
         {
-            if (Midi2PioUsbhub::instance().is_device_configured(Midi2PioUsbhub::instance().get_midi_out_port_list().at(col)->devaddr))
+            uint8_t devaddr = Midi2PioUsbhub::instance().get_midi_out_port_list().at(col)->devaddr;
+            if (devaddr > CFG_TUH_DEVICE_MAX || Midi2PioUsbhub::instance().is_device_configured(devaddr))
                 printf("---+");
-        }
+            }
         printf("\r\n");
     }
 }

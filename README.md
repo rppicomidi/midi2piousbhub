@@ -18,9 +18,9 @@ built-in USB port's serial (CDC ACM) interface.
 The software uses some of the Pico board's program flash for a file system
 to store configurations in presets. If you save your settings to a preset, then
 the midi2piousbhub software will automatically reload the last saved preset on startup
-and when you plug a Connected MIDI Device to the hub. You can back up any or all of
+and when you plug a USB MIDI Device to the host port. You can back up any or all of
 your presets to a USB Flash drive connected to the USB hub. Presets are stored in
-JSON format. 
+JSON format.
 
 # Hardware
 My first test circuit used a Raspberry Pi Pico board, a USB A breakout board,
@@ -214,10 +214,11 @@ descriptor to memory.
 
 # Terms this document uses
 - **Connected MIDI Device**: a MIDI device connected to a USB hub port or to a serial
-port MIDI DIN connector.
+port MIDI DIN connector, or the USB C Device interface or the Bluetooth LE MIDI.
 - **USB ID**: A pair of numbers the Connected MIDI Device reports to the
 hub when it connects. They are supposed to be unique to a particular
-product.
+product. The MIDI DIN connectors, the USB C Device interface, and the Bluetooth LE
+MIDI interface have fake USB ID numbers to be compatible with this system.
 - **Routing Matrix**: The software that sends MIDI data to and from Connected MIDI Devices
 - **Terminal**: a MIDI data input to or output from the Routing Matrix.
 - **FROM terminal**: an input to the Routing Matrix. It will be a MIDI OUT signal from
@@ -237,6 +238,10 @@ direction is the USB ID followed by either a "F" for a FROM data stream or
 device. The Connected MIDI Device sends it to the hub on connection; it is a more friendly
 name than USB ID, and is the easiest way to assocate the Connected MIDI Device
 with all the other info.
+- **Dedicated Device**: The DIN MIDI ports, the Bluetooth LE MIDI interface, and USB C Device
+interface always have place holders in the system, so you can always route them. These
+are therefore dedicated devices.
+
 
 # Command Line Commands
 ## help
@@ -280,8 +285,11 @@ Disconnect all routings.
 
 ## show
 Show a connection matrix of all MIDI devices connected to the hub. A blank box means "not
-connected" and an `x` in the box means "connected." For example, the following shows
+connected" and an `x` in the box means "connected." A '!' in the box means the dedicated
+device is routed but is not connected. For example, the following shows
 MIDI OUT of the "keys" device connected to the MIDI IN of the "lead" device.
+The "faders" device in this example is Bluetooth LE MIDI, and is currently not connected, so
+the connection to the "lead" device is shown with an '!'.
 
 ```
        TO-> |   |   |   |
@@ -301,7 +309,7 @@ lead        |   |   |   |
 ------------+---+---+---+
 keys        | x |   |   |
 ------------+---+---+---+
-faders      |   |   |   |
+faders      | ! |   |   |
 ------------+---+---+---+
 ```
 
