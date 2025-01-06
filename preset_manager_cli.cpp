@@ -65,27 +65,53 @@ rppicomidi::Preset_manager_cli::Preset_manager_cli(EmbeddedCli* cli, Preset_mana
 void rppicomidi::Preset_manager_cli::static_save_current_preset(EmbeddedCli* cli, char* args, void* context)
 {
     (void)cli;
-    if (embeddedCliGetTokenCount(args) != 1) {
+    if (embeddedCliGetTokenCount(args) > 1) {
         printf("usage: save <filename>\r\n");
         return;
     }
-    if (reinterpret_cast<Preset_manager*>(context)->save_current_preset(std::string(embeddedCliGetToken(args, 1)))) {
-        printf("Saved preset %s as current preset\r\n",embeddedCliGetToken(args, 1));
+    std::string preset_name;
+    if (embeddedCliGetTokenCount(args) == 0) {
+        reinterpret_cast<Preset_manager*>(context)->get_current_preset_name(preset_name);
+        if (preset_name.size() == 0) {
+            printf("could not load default preset name\r\n");
+        }
+        else {
+            printf("loading default preset %s\r\n", preset_name.c_str());
+        }
+    }
+    else {
+        preset_name = std::string(embeddedCliGetToken(args, 1));
+    }
+    if (reinterpret_cast<Preset_manager*>(context)->save_current_preset(preset_name)) {
+        printf("Saved preset %s as current preset\r\n", preset_name.c_str());
     }
 }
 
 void rppicomidi::Preset_manager_cli::static_load_preset(EmbeddedCli* cli, char* args, void* context)
 {
     (void)cli;
-    if (embeddedCliGetTokenCount(args) != 1) {
+    if (embeddedCliGetTokenCount(args) > 1) {
         printf("usage: load <filename>\r\n");
         return;
     }
-    if (reinterpret_cast<Preset_manager*>(context)->load_preset(std::string(embeddedCliGetToken(args, 1)))) {
-        printf("Loaded preset %s as current preset\r\n",embeddedCliGetToken(args, 1));
+    std::string preset_name;
+    if (embeddedCliGetTokenCount(args) == 0) {
+        reinterpret_cast<Preset_manager*>(context)->get_current_preset_name(preset_name);
+        if (preset_name.size() == 0) {
+            printf("could not load default preset name\r\n");
+        }
+        else {
+            printf("loading default preset %s\r\n", preset_name.c_str());
+        }
     }
     else {
-        printf("Failed to load preset %s\r\n", embeddedCliGetToken(args, 1));
+        preset_name = std::string(embeddedCliGetToken(args, 1));
+    }
+    if (reinterpret_cast<Preset_manager*>(context)->load_preset(preset_name)) {
+        printf("Loaded preset %s as current preset\r\n", preset_name.c_str());
+    }
+    else {
+        printf("Failed to load preset %s\r\n", preset_name.c_str());
     }
 }
 
