@@ -37,7 +37,7 @@ public:
     void operator=(BLE_MIDI_Manager_cli const&) = delete;
     ~BLE_MIDI_Manager_cli()=default;
     BLE_MIDI_Manager_cli(EmbeddedCli* cli_, BLE_MIDI_Manager* blem_);
-    static uint16_t get_num_commands() { return 8; }
+    static uint16_t get_num_commands() { return 9; }
 private:
     // The following are CLI functions
     static void static_disconnect(EmbeddedCli *, char *, void *);
@@ -48,6 +48,7 @@ private:
     static void static_scan_list(EmbeddedCli *, char *, void *);
     static void static_client_connect(EmbeddedCli *, char *, void *);
     static void static_start_server(EmbeddedCli *, char *, void *);
+    static void static_get_state(EmbeddedCli *, char *, void *);
     // data
     EmbeddedCli* cli;
     BLE_MIDI_Manager* blem;

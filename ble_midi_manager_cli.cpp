@@ -91,6 +91,14 @@ rppicomidi::BLE_MIDI_Manager_cli::BLE_MIDI_Manager_cli(EmbeddedCli* cli_, BLE_MI
         static_start_server
     });
     assert(result);
+    result = embeddedCliAddBinding(cli, {
+        "btmidi-get-state",
+        "return Client or Server, Connected or Disconnected",
+        true,
+        blem_,
+        static_get_state
+    });
+    assert(result);
     (void)result;
 }
 
@@ -168,5 +176,23 @@ void rppicomidi::BLE_MIDI_Manager_cli::static_start_server(EmbeddedCli *, char *
         printf("already in server mode\r\n");
     }
     blem->init(blem, false);
+}
+
+void rppicomidi::BLE_MIDI_Manager_cli::static_get_state(EmbeddedCli *, char *args, void *context)
+{
+    if (embeddedCliGetTokenCount(args) != 0) {
+        printf("blmidi-get-state\r\n");
+        return;
+    }
+    auto blem = reinterpret_cast<BLE_MIDI_Manager*>(context);
+    printf("Current Bluetooth LE MIDI state is %s:%s\r\n",
+            blem->is_client_mode()?"Client":"Server",
+            blem->is_connected()?"Connected":"Disconnected");
+    if (blem->is_client_mode()) {
+        uint8_t bdaddr[6];
+        int typ = blem->get_last_connected(bdaddr);
+        const char* bdaddr_str = bd_addr_to_str(bdaddr);
+        printf("previously connected %s type %d", bdaddr_str, typ);
+    }
 }
 #endif
