@@ -59,7 +59,11 @@ public:
      * 
      * @param preset_name the name of the preset to load
      */
+#ifdef RPPICOMIDI_PICO_W
+    bool load_preset(std::string preset_name, bool skip_bluetooth);
+#else
     bool load_preset(std::string preset_name);
+#endif
 
     /**
      * @brief Get the current preset name

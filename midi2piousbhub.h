@@ -130,7 +130,11 @@ namespace rppicomidi
          * @param serialized_settings
          */
         void serialize(std::string &serialized_settings);
-        bool deserialize(std::string &serialized_settings);
+#ifdef RPPICOMIDI_PICO_W
+        bool deserialize(std::string &serialized_settings, bool skip_bluetooth);
+#else
+        bool rppicomidi::Midi2PioUsbhub::deserialize(std::string &serialized_string);
+#endif
         /**
          * @brief connect the MIDI stream from the device and port from_nickname
          * to the device and port to_nickname
@@ -187,8 +191,10 @@ namespace rppicomidi
 #if RPPICOMIDI_PICO_W
         bool blem_init(bool is_client_) { return blem.init(&blem, is_client_);}
         bool blem_init() {return blem_init(blem_is_client); }
-#endif
+        void load_current_preset(bool skip_bluetooth);
+#else
         void load_current_preset();
+#endif
     private:
         Midi2PioUsbhub();
         Preset_manager preset_manager;

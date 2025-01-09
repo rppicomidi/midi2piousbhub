@@ -186,6 +186,7 @@ public:
 
     bool is_server_mode() {return !is_client; }
     bool is_client_mode() {return is_client; }
+    bool is_initialized() {return initialized; }
     bool reconnect();
 private:
     /**

@@ -234,7 +234,11 @@ int rppicomidi::Preset_manager::load_settings_string(const char* settings_filena
     }
 }
 
+#ifdef RPPICOMIDI_PICO_W
+bool rppicomidi::Preset_manager::load_preset(std::string preset_name, bool skip_bluetooth)
+#else
 bool rppicomidi::Preset_manager::load_preset(std::string preset_name)
+#endif
 {
     char* raw_preset_string;
     int error_code = load_settings_string(preset_name.c_str(), &raw_preset_string);
@@ -242,7 +246,11 @@ bool rppicomidi::Preset_manager::load_preset(std::string preset_name)
     if (error_code > 0) {
         std::string settings = std::string(raw_preset_string);
         delete[] raw_preset_string;
+#ifdef RPPICOMIDI_PICO_W
+        if (Midi2PioUsbhub::instance().deserialize(settings, skip_bluetooth)) {
+#else
         if (Midi2PioUsbhub::instance().deserialize(settings)) {
+#endif
             if (update_current_preset(preset_name)) {
                 printf("load preset %s successful\r\n", preset_name.c_str());
                 result = true;

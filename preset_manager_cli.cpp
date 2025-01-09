@@ -107,7 +107,11 @@ void rppicomidi::Preset_manager_cli::static_load_preset(EmbeddedCli* cli, char* 
     else {
         preset_name = std::string(embeddedCliGetToken(args, 1));
     }
+#ifdef RPPICOMIDI_PICO_W
+    if (reinterpret_cast<Preset_manager*>(context)->load_preset(preset_name, false)) {
+#else
     if (reinterpret_cast<Preset_manager*>(context)->load_preset(preset_name)) {
+#endif
         printf("Loaded preset %s as current preset\r\n", preset_name.c_str());
     }
     else {

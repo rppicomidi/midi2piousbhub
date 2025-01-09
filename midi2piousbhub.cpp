@@ -181,7 +181,11 @@ void rppicomidi::Midi2PioUsbhub::serialize(std::string &serialized_string)
     json_value_free(root_value);
 }
 
+#ifdef RPPICOMIDI_PICO_W
+bool rppicomidi::Midi2PioUsbhub::deserialize(std::string &serialized_string, bool skip_bluetooth)
+#else
 bool rppicomidi::Midi2PioUsbhub::deserialize(std::string &serialized_string)
+#endif
 {
     JSON_Value* root_value = json_parse_string(serialized_string.c_str());
     if (root_value == nullptr) {
@@ -284,51 +288,58 @@ bool rppicomidi::Midi2PioUsbhub::deserialize(std::string &serialized_string)
         return false;
     }
     #ifdef RPPICOMIDI_PICO_W
-    JSON_Value* bluetooth_value = json_object_get_value(root_object, "bluetooth");
-    if (bluetooth_value != nullptr) {
-        JSON_Object* bluetooth_object = json_value_get_object(bluetooth_value);
-        int addr_typ;
-        const char* addr_str;
-        uint8_t bdaddr[6];
-        uint8_t prev_bdaddr[6];
-        int prev_addr_typ = blem.get_last_connected(prev_bdaddr);
-        int is_client;
-        if (json_object_has_value_of_type(bluetooth_object, "last_addr_type", JSONNumber)) {
-            addr_typ = json_object_get_number(bluetooth_object, "last_addr_type");
-        }
-        else {
-            // poorly formatted JSON
-            json_value_free(root_value);
-            return false;
-        }
-        addr_str = json_object_get_string(bluetooth_object, "last_addr");
-        if (sscanf_bd_addr(addr_str, bdaddr) != 1) {
-            // poorly formatted JSON
-            json_value_free(root_value);
-            return false;
-        }
-        is_client = json_object_get_boolean(bluetooth_object, "is_client");
-        if (is_client == -1) {
-             // poorly formatted JSON
-            json_value_free(root_value);
-            return false;
-        }
-        blem_is_client = (is_client != 0);
-        if (blem_is_client != blem.is_client_mode()) {
-            if (blem_is_client) {
+    if (!skip_bluetooth) {
+        JSON_Value* bluetooth_value = json_object_get_value(root_object, "bluetooth");
+        if (bluetooth_value != nullptr) {
+            JSON_Object* bluetooth_object = json_value_get_object(bluetooth_value);
+            int addr_typ;
+            const char* addr_str;
+            uint8_t bdaddr[6];
+            uint8_t prev_bdaddr[6];
+            int prev_addr_typ = blem.get_last_connected(prev_bdaddr);
+            int is_client;
+            if (json_object_has_value_of_type(bluetooth_object, "last_addr_type", JSONNumber)) {
+                addr_typ = json_object_get_number(bluetooth_object, "last_addr_type");
+            }
+            else {
+                // poorly formatted JSON
+                json_value_free(root_value);
+                return false;
+            }
+            addr_str = json_object_get_string(bluetooth_object, "last_addr");
+            if (sscanf_bd_addr(addr_str, bdaddr) != 1) {
+                // poorly formatted JSON
+                json_value_free(root_value);
+                return false;
+            }
+            is_client = json_object_get_boolean(bluetooth_object, "is_client");
+            if (is_client == -1) {
+                // poorly formatted JSON
+                json_value_free(root_value);
+                return false;
+            }
+            blem_is_client = (is_client != 0);
+            if (blem_is_client != blem.is_client_mode()) {
+                if (blem_is_client) {
+                    blem.set_last_connected(addr_typ, bdaddr);
+                    blem.reconnect();
+                }
+                else {
+                    blem_init(false);
+                }
+            }
+            else if (blem_is_client && (addr_typ != prev_addr_typ || memcmp(bdaddr, prev_bdaddr, 6)) != 0) {
                 blem.set_last_connected(addr_typ, bdaddr);
                 blem.reconnect();
             }
-            else {
-                blem_init(false);
+        }
+        else {
+            // else it is OK if it it is nullptr. Might be a preset from a non-Bluetooth enabled device
+            if (!blem.is_initialized()) {
+                blem.init(&blem, false);
             }
         }
-        else if (blem_is_client && (addr_typ != prev_addr_typ || memcmp(bdaddr, prev_bdaddr, 6)) != 0) {
-            blem.set_last_connected(addr_typ, bdaddr);
-            blem.reconnect();
-        }
     }
-    // else it is OK if it it is nullptr. Might be a preset from a non-Bluetooth enabled device
     #endif
     json_value_free(root_value);
     return true;
@@ -716,12 +727,19 @@ void rppicomidi::Midi2PioUsbhub::task()
     }
 }
 
-
+#ifdef RPPICOMIDI_PICO_W
+void rppicomidi::Midi2PioUsbhub::load_current_preset(bool skip_bluetooth)
+#else
 void rppicomidi::Midi2PioUsbhub::load_current_preset()
+#endif
 {
     std::string current;
     instance().preset_manager.get_current_preset_name(current);
+#ifdef RPPICOMIDI_PICO_W
+    if (current.length() < 1 || !instance().preset_manager.load_preset(current, skip_bluetooth)) {
+#else
     if (current.length() < 1 || !instance().preset_manager.load_preset(current)) {
+#endif
         printf("current preset load failed.\r\n");
     }
 }
@@ -744,7 +762,7 @@ int main()
     while(core1_booting) {
     }
     rppicomidi::Midi2PioUsbhub &instance = rppicomidi::Midi2PioUsbhub::instance();
-    instance.load_current_preset();
+    instance.load_current_preset(false);
 #if RPPICOMIDI_PICO_W
     if (!instance.blem_init()) {
         printf("Error starting up Bluetooth Module\r\nProgam stalled\r\n");
@@ -818,7 +836,7 @@ void rppicomidi::Midi2PioUsbhub::prod_str_cb(tuh_xfer_t *xfer)
                                                  midi_out->cable, false);
             }
         }
-        instance().load_current_preset();
+        instance().load_current_preset(true);
         devinfo->configured = true;
     }
 }
