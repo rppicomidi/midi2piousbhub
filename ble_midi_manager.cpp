@@ -96,6 +96,8 @@ rppicomidi::BLE_MIDI_Manager::BLE_MIDI_Manager(const char* local_name) :
         printf("ble-midi2usbhost: failed to initialize cyw43_arch\n");
         assert(false);
     }
+    uint8_t bdaddr[6] = {0,0,0,0,0,0};
+    set_last_connected(BD_ADDR_TYPE_UNKNOWN, bdaddr);
 }
 
 bool rppicomidi::BLE_MIDI_Manager::init(BLE_MIDI_Manager* instance_, bool is_client_)
@@ -235,6 +237,11 @@ void rppicomidi::BLE_MIDI_Manager::scan_begin()
     is_scan_mode = true;
     is_client = true;
     initialized = true;
+}
+
+bool rppicomidi::BLE_MIDI_Manager::reconnect()
+{
+    return ble_midi_client_request_connect(0);
 }
 
 #endif // ifdef RPPICOMIDI_PICO_W

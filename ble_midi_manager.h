@@ -138,7 +138,7 @@ public:
      * @param addr points to the 6-byte BDADDR of the lastt connected BLE MIDI server
      * @return true if in client mode, false in server mode.
      */
-    bool set_last_connected(int addr_type, uint8_t addr[6]) {if (!is_client) return false; ble_midi_client_set_last_connected(addr_type, addr); return true; }
+    void set_last_connected(int addr_type, uint8_t addr[6]) {ble_midi_client_set_last_connected(addr_type, addr); }
 
     /**
      * @brief read a MIDI stream from the connected Bluetooth LE MIDI device
@@ -185,6 +185,8 @@ public:
     void scan_begin();
 
     bool is_server_mode() {return !is_client; }
+    bool is_client_mode() {return is_client; }
+    bool reconnect();
 private:
     /**
      * @brief called by static_packet_handler to handle BT Stack messages

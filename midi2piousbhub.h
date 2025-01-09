@@ -185,8 +185,10 @@ namespace rppicomidi
         const std::vector<Midi_in_port *>& get_midi_in_port_list() {return midi_in_port_list; }
         void notify_cdc_state_changed() {cdc_state_has_changed = true; }
 #if RPPICOMIDI_PICO_W
-        bool blem_init(bool is_client) { return blem.init(&blem, is_client);}
+        bool blem_init(bool is_client_) { return blem.init(&blem, is_client_);}
+        bool blem_init() {return blem_init(blem_is_client); }
 #endif
+        void load_current_preset();
     private:
         Midi2PioUsbhub();
         Preset_manager preset_manager;
@@ -194,7 +196,6 @@ namespace rppicomidi
 
         static void langid_cb(tuh_xfer_t *xfer);
         static void prod_str_cb(tuh_xfer_t *xfer);
-        void load_current_preset();
         // UART selection Pin mapping. You can move these for your design if you want to
         // Make sure all these values are consistent with your choice of midi_uart
         static const uint MIDI_UART_NUM = 1;
@@ -225,6 +226,7 @@ namespace rppicomidi
         Midi_out_port ble_midi_out_port;
         #if RPPICOMIDI_PICO_W
         BLE_MIDI_Manager blem;
+        bool blem_is_client;
         #endif
         Midi2PioUsbhub_cli cli;
         bool cdc_state_has_changed;

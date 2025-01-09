@@ -163,6 +163,18 @@ void rppicomidi::Midi2PioUsbhub::serialize(std::string &serialized_string)
     }
     json_object_set_value(root_object, "routing", routing_value);
 
+#ifdef RPPICOMIDI_PICO_W
+    JSON_Value *bluetooth_value = json_value_init_object();
+    JSON_Object *bluetooth_object = json_value_get_object(bluetooth_value);
+    uint8_t bdaddr[6];
+    int adtyp = blem.get_last_connected(bdaddr);
+    const char* bdaddr_str = bd_addr_to_str(bdaddr);
+    json_object_set_number(bluetooth_object, "last_addr_type", adtyp);
+    json_object_set_string(bluetooth_object, "last_addr", bdaddr_str);
+    json_object_set_boolean(bluetooth_object, "is_client", blem.is_client_mode());
+    json_object_set_value(root_object, "bluetooth", bluetooth_value);
+#endif
+
     auto ser = json_serialize_to_string(root_value);
     serialized_string = std::string(ser);
     json_free_serialized_string(ser);
@@ -191,6 +203,9 @@ bool rppicomidi::Midi2PioUsbhub::deserialize(std::string &serialized_string)
             const char* nickname = json_object_get_string(midi_in_nicknames_object, def_nickname.c_str());
             if (nickname) {
                 midi_in->nickname = std::string(nickname);
+            }
+            else {
+                printf("could not find nickname %s\r\n", def_nickname.c_str());
             }
         }
     }
@@ -257,8 +272,9 @@ bool rppicomidi::Midi2PioUsbhub::deserialize(std::string &serialized_string)
             }
             else {
                 // poorly formatted JSON
-                json_value_free(root_value);
-                return false;
+                //json_value_free(root_value);
+                //return false;
+                printf("%s is not routed\r\n", midi_in->nickname.c_str());
             }
         }
     }
@@ -267,6 +283,53 @@ bool rppicomidi::Midi2PioUsbhub::deserialize(std::string &serialized_string)
         json_value_free(root_value);
         return false;
     }
+    #ifdef RPPICOMIDI_PICO_W
+    JSON_Value* bluetooth_value = json_object_get_value(root_object, "bluetooth");
+    if (bluetooth_value != nullptr) {
+        JSON_Object* bluetooth_object = json_value_get_object(bluetooth_value);
+        int addr_typ;
+        const char* addr_str;
+        uint8_t bdaddr[6];
+        uint8_t prev_bdaddr[6];
+        int prev_addr_typ = blem.get_last_connected(prev_bdaddr);
+        int is_client;
+        if (json_object_has_value_of_type(bluetooth_object, "last_addr_type", JSONNumber)) {
+            addr_typ = json_object_get_number(bluetooth_object, "last_addr_type");
+        }
+        else {
+            // poorly formatted JSON
+            json_value_free(root_value);
+            return false;
+        }
+        addr_str = json_object_get_string(bluetooth_object, "last_addr");
+        if (sscanf_bd_addr(addr_str, bdaddr) != 1) {
+            // poorly formatted JSON
+            json_value_free(root_value);
+            return false;
+        }
+        is_client = json_object_get_boolean(bluetooth_object, "is_client");
+        if (is_client == -1) {
+             // poorly formatted JSON
+            json_value_free(root_value);
+            return false;
+        }
+        blem_is_client = (is_client != 0);
+        if (blem_is_client != blem.is_client_mode()) {
+            if (blem_is_client) {
+                blem.set_last_connected(addr_typ, bdaddr);
+                blem.reconnect();
+            }
+            else {
+                blem_init(false);
+            }
+        }
+        else if (blem_is_client && (addr_typ != prev_addr_typ || memcmp(bdaddr, prev_bdaddr, 6)) != 0) {
+            blem.set_last_connected(addr_typ, bdaddr);
+            blem.reconnect();
+        }
+    }
+    // else it is OK if it it is nullptr. Might be a preset from a non-Bluetooth enabled device
+    #endif
     json_value_free(root_value);
     return true;
 }
@@ -375,7 +438,7 @@ void rppicomidi::Midi2PioUsbhub::flush_usb_tx()
     {
         // Call tuh_midi_stream_flush() once per output port device address
         uint32_t port_mask = 1 << out_port->devaddr;
-        if (out_port->devaddr < CFG_TUH_DEVICE_MAX &&
+        if (out_port->devaddr <= CFG_TUH_DEVICE_MAX &&
             (port_flushed_mask && port_mask) == 0 &&
             tuh_midi_configured(out_port->devaddr))
         {
@@ -480,7 +543,7 @@ void rppicomidi::Midi2PioUsbhub::poll_ble_rx()
 #endif
 
 #ifdef RPPICOMIDI_PICO_W
-rppicomidi::Midi2PioUsbhub::Midi2PioUsbhub() : blem{"Pico W MIDI USB BLE Hub"}, cli{&preset_manager, &blem}
+rppicomidi::Midi2PioUsbhub::Midi2PioUsbhub() : blem{"Pico W MIDI USB BLE Hub"}, blem_is_client{false}, cli{&preset_manager, &blem}
 #else
 rppicomidi::Midi2PioUsbhub::Midi2PioUsbhub() : cli{&preset_manager}
 #endif
@@ -620,20 +683,9 @@ void rppicomidi::Midi2PioUsbhub::task()
 
     poll_midi_uart_rx();
     // TinyUSB provides no mounted callback for USB MIDI devices
-    bool prev_configured = attached_devices[usbdev_devaddr].configured;
     attached_devices[usbdev_devaddr].configured = tud_midi_mounted();
-    if (attached_devices[usbdev_devaddr].configured && !prev_configured) {
-        load_current_preset();
-    }
 #ifdef RPPICOMIDI_PICO_W
-    prev_configured = attached_devices[ble_devaddr].configured;
     attached_devices[ble_devaddr].configured = blem.is_connected();
-    if (attached_devices[ble_devaddr].configured && !prev_configured) {
-        load_current_preset();
-        uint8_t addr[6];
-        int addr_type = blem.get_last_connected(addr);
-        printf("TODO: store addr_type=%d %s\r\n", addr_type, bd_addr_to_str(addr));
-    }
 #endif
     poll_midi_usbdev_rx();
 #ifdef RPPICOMIDI_PICO_W
@@ -692,8 +744,9 @@ int main()
     while(core1_booting) {
     }
     rppicomidi::Midi2PioUsbhub &instance = rppicomidi::Midi2PioUsbhub::instance();
+    instance.load_current_preset();
 #if RPPICOMIDI_PICO_W
-    if (!instance.blem_init(false)) {
+    if (!instance.blem_init()) {
         printf("Error starting up Bluetooth Module\r\nProgam stalled\r\n");
         for (;;) {
             tight_loop_contents();
