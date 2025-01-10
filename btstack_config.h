@@ -7,8 +7,8 @@
 
 // BTstack features that can be enabled
 #define ENABLE_LE_PERIPHERAL
-#define ENABLE_LOG_INFO 1
-#define ENABLE_LOG_ERROR
+//#define ENABLE_LOG_INFO 1
+//#define ENABLE_LOG_ERROR 1
 #define ENABLE_PRINTF_HEXDUMP
 #define ENABLE_LE_SECURE_CONNECTIONS 1
 // should be helpful for throughput for long sysex messages
