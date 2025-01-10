@@ -322,6 +322,7 @@ bool rppicomidi::Midi2PioUsbhub::deserialize(std::string &serialized_string)
             if (blem_is_client != blem.is_client_mode()) {
                 if (blem_is_client) {
                     blem.set_last_connected(addr_typ, bdaddr);
+                    blem_init(true);
                     blem.reconnect();
                 }
                 else {
