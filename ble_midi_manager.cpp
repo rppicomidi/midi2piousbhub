@@ -92,12 +92,12 @@ rppicomidi::BLE_MIDI_Manager::BLE_MIDI_Manager(const char* local_name) :
     scan_resp_data[0] = local_name_len+1;
     memcpy(scan_resp_data+2, local_name, local_name_len);
     scan_resp_data_len = local_name_len+2;
+    uint8_t bdaddr[6] = {0,0,0,0,0,0};
+    set_last_connected(BD_ADDR_TYPE_UNKNOWN, bdaddr);
     if (cyw43_arch_init()) {
         printf("ble-midi2usbhost: failed to initialize cyw43_arch\n");
         assert(false);
     }
-    uint8_t bdaddr[6] = {0,0,0,0,0,0};
-    set_last_connected(BD_ADDR_TYPE_UNKNOWN, bdaddr);
 }
 
 bool rppicomidi::BLE_MIDI_Manager::init(BLE_MIDI_Manager* instance_, bool is_client_)
@@ -107,6 +107,8 @@ bool rppicomidi::BLE_MIDI_Manager::init(BLE_MIDI_Manager* instance_, bool is_cli
     }
     is_client = is_client_;
     instance = instance_;
+    auto context = cyw43_arch_async_context();
+    async_context_acquire_lock_blocking(context);
     // pairing request will display a numeric match value if the other end has a display too.
     if (is_client) {
         const char client_name[]="Pico W MIDI USB BLE Hub";
@@ -122,6 +124,7 @@ bool rppicomidi::BLE_MIDI_Manager::init(BLE_MIDI_Manager* instance_, bool is_cli
             SM_AUTHREQ_SECURE_CONNECTION | SM_AUTHREQ_MITM_PROTECTION | SM_AUTHREQ_BONDING
         );
     }
+    async_context_release_lock(context);
     initialized = true;
     return true;
 }
@@ -130,23 +133,41 @@ void rppicomidi::BLE_MIDI_Manager::deinit()
 {
     if (!initialized)
         return; // nothing to do
+    auto context = cyw43_arch_async_context();
+    async_context_acquire_lock_blocking(context);
     if (is_client)
         ble_midi_client_deinit();
     else
         ble_midi_server_deinit();
+    async_context_release_lock(context);
+    // Wait for deinit to complete
+    if (is_client) {
+        while(!ble_midi_client_is_off()) {
+            sleep_ms(10);
+        }
+    }
+    else {
+        while(ble_midi_server_is_initialized()) {
+            sleep_ms(10);
+        }
+    }
     initialized = false;
 }
 
 uint8_t rppicomidi::BLE_MIDI_Manager::stream_read(uint8_t* bytes, uint8_t max_bytes)
 {
     uint16_t timestamp;
+    uint8_t result = 0;
     if (is_connected()) {
+        auto context = cyw43_arch_async_context();
+        async_context_acquire_lock_blocking(context);
         if (is_client)
-            return ble_midi_client_stream_read(max_bytes, bytes, &timestamp);
+            result = ble_midi_client_stream_read(max_bytes, bytes, &timestamp);
         else
-            return ble_midi_server_stream_read(max_bytes, bytes, &timestamp);
+            result = ble_midi_server_stream_read(max_bytes, bytes, &timestamp);
+        async_context_release_lock(context);
     }
-    return 0;
+    return result;
 }
 
 uint8_t rppicomidi::BLE_MIDI_Manager::stream_write(const uint8_t* bytes, uint8_t num_bytes)
@@ -170,6 +191,8 @@ void rppicomidi::BLE_MIDI_Manager::disconnect()
 {
     //next_connect_bd_addr_type = BD_ADDR_TYPE_UNKNOWN;
     if (is_connected()) {
+        auto context = cyw43_arch_async_context();
+        async_context_acquire_lock_blocking(context);
         if (is_client) {
             ble_midi_client_request_disconnect();
         }
@@ -177,6 +200,7 @@ void rppicomidi::BLE_MIDI_Manager::disconnect()
             //gap_disconnect(con_handle);
             ble_midi_server_request_disconnect();
         }
+        async_context_release_lock(context);
     }
 }
 
@@ -191,9 +215,12 @@ void rppicomidi::BLE_MIDI_Manager::list_le_device_info()
     int count = 0;
     printf("\r\nBonded Device List\r\n");
     printf("Entry Bluetooth Address Type\r\n");
+    auto context = cyw43_arch_async_context();
     for (int idx=0; idx < max_count; idx++) {
         int entry_address_type = (int) BD_ADDR_TYPE_UNKNOWN;
+        async_context_acquire_lock_blocking(context);
         le_device_db_info(idx, &entry_address_type, entry_address, NULL);
+        async_context_release_lock(context);
         // skip non-LE and unused entries
         if (entry_address_type >= (int)BD_ADDR_TYPE_SCO)
             continue;
@@ -202,38 +229,46 @@ void rppicomidi::BLE_MIDI_Manager::list_le_device_info()
             entry_address[4],entry_address[5], addr_type_str[entry_address_type]);
         ++count;
     }
+
     printf("\r\ntotal of %d bonded entries of %d maximum entries\r\n", count, max_count);
 }
 
 void rppicomidi::BLE_MIDI_Manager::delete_le_bonding_info(int idx)
 {
+    auto context = cyw43_arch_async_context();
+    async_context_acquire_lock_blocking(context);
     int max_count = le_device_db_max_count();
     if (idx >= max_count) {
         printf("invalid device index %d\r\n", idx);
+        async_context_release_lock(context);
         return;
     }
     bd_addr_t entry_address;
     int entry_address_type = (int) BD_ADDR_TYPE_UNKNOWN;
     le_device_db_info(idx, &entry_address_type, entry_address, NULL);
+    async_context_release_lock(context);
     if (entry_address_type <= (int)BD_ADDR_TYPE_LE_RANDOM_IDENTITY) {
         printf("deleting entry=%d addr=%02x:%02x:%02x:%02x:%02x:%02x\r\n",
             idx, entry_address[0],entry_address[1],entry_address[2],entry_address[3],
             entry_address[4],entry_address[5]);
+        async_context_acquire_lock_blocking(context);
         gap_delete_bonding(static_cast<bd_addr_type_t>(entry_address_type), entry_address);
+        async_context_release_lock(context);
     }
     else {
         printf("invalid device index %d\r\n", idx);
-        return;
     }
 }
 
 void rppicomidi::BLE_MIDI_Manager::scan_begin()
 {    
     if (!is_client) {
-        deinit();
         init(this, true);
     }
+    auto context = cyw43_arch_async_context();
+    async_context_acquire_lock_blocking(context);
     ble_midi_client_scan_begin();
+    async_context_release_lock(context);
     is_scan_mode = true;
     is_client = true;
     initialized = true;
@@ -241,7 +276,11 @@ void rppicomidi::BLE_MIDI_Manager::scan_begin()
 
 bool rppicomidi::BLE_MIDI_Manager::reconnect()
 {
-    return ble_midi_client_request_connect(0);
+    auto context = cyw43_arch_async_context();
+    async_context_acquire_lock_blocking(context);
+    bool result = ble_midi_client_request_connect(0);
+    async_context_release_lock(context);
+    return result;
 }
 
 #endif // ifdef RPPICOMIDI_PICO_W
