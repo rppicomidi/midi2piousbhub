@@ -141,15 +141,22 @@ void rppicomidi::BLE_MIDI_Manager::deinit()
         ble_midi_server_deinit();
     async_context_release_lock(context);
     // Wait for deinit to complete
+    int32_t timeout = 1000;
     if (is_client) {
-        while(!ble_midi_client_is_off()) {
+        while(timeout >= 0 && !ble_midi_client_is_off()) {
             sleep_ms(10);
+            timeout--;
         }
+        if (timeout < 0)
+            printf("timeout on client deinit()\r\n");
     }
     else {
-        while(ble_midi_server_is_initialized()) {
+        while(timeout >= 0 && ble_midi_server_is_initialized()) {
             sleep_ms(10);
+            timeout--;
         }
+        if (timeout < 0)
+            printf("timeout on server deinit()\r\n");
     }
     initialized = false;
 }
