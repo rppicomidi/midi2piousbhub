@@ -105,12 +105,11 @@ bool rppicomidi::BLE_MIDI_Manager::init(BLE_MIDI_Manager* instance_, bool is_cli
     if (initialized) {
         deinit();
     }
-    is_client = is_client_;
     instance = instance_;
     auto context = cyw43_arch_async_context();
     async_context_acquire_lock_blocking(context);
     // pairing request will display a numeric match value if the other end has a display too.
-    if (is_client) {
+    if (is_client_) {
         const char client_name[]="Pico W MIDI USB BLE Hub";
         ble_midi_client_init(client_name, strlen(client_name),
             IO_CAPABILITY_DISPLAY_ONLY,
@@ -124,6 +123,8 @@ bool rppicomidi::BLE_MIDI_Manager::init(BLE_MIDI_Manager* instance_, bool is_cli
             SM_AUTHREQ_SECURE_CONNECTION | SM_AUTHREQ_MITM_PROTECTION | SM_AUTHREQ_BONDING
         );
     }
+    is_client = is_client_;
+
     async_context_release_lock(context);
     initialized = true;
     return true;

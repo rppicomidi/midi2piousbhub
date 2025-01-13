@@ -319,7 +319,7 @@ bool rppicomidi::Midi2PioUsbhub::deserialize(std::string &serialized_string)
                 return false;
             }
             blem_is_client = (is_client != 0);
-            if (blem_is_client != blem.is_client_mode()) {
+            if (blem_is_client != blem.is_client_mode() || !blem.is_initialized()) {
                 if (blem_is_client) {
                     blem.set_last_connected(addr_typ, bdaddr);
                     blem_init(true);
@@ -555,7 +555,7 @@ void rppicomidi::Midi2PioUsbhub::poll_ble_rx()
 #endif
 
 #ifdef RPPICOMIDI_PICO_W
-rppicomidi::Midi2PioUsbhub::Midi2PioUsbhub() : blem{"Pico W MIDI USB BLE Hub"}, blem_is_client{false}, cli{&preset_manager, &blem}
+rppicomidi::Midi2PioUsbhub::Midi2PioUsbhub() : blem{"Pico W MIDI USB BLE Hub"}, cli{&preset_manager, &blem}
 #else
 rppicomidi::Midi2PioUsbhub::Midi2PioUsbhub() : cli{&preset_manager}
 #endif
@@ -568,6 +568,9 @@ rppicomidi::Midi2PioUsbhub::Midi2PioUsbhub() : cli{&preset_manager}
     tud_init(BOARD_TUD_RHPORT);
     cdc_stdio_lib_init();
 
+#ifdef RPPICOMIDI_PICO_W
+    blem_is_client = blem.is_client_mode();
+#endif
     // Map the pins to functions
     gpio_init(LED_GPIO);
     gpio_set_dir(LED_GPIO, GPIO_OUT);
@@ -764,14 +767,6 @@ int main()
     }
     rppicomidi::Midi2PioUsbhub &instance = rppicomidi::Midi2PioUsbhub::instance();
     instance.load_current_preset(false);
-#if RPPICOMIDI_PICO_W
-    if (!instance.blem_init()) {
-        printf("Error starting up Bluetooth Module\r\nProgam stalled\r\n");
-        for (;;) {
-            tight_loop_contents();
-        }
-    }
-#endif
     core0_booting = false;
     while (1) {
         instance.task();
