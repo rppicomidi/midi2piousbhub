@@ -84,6 +84,14 @@ rppicomidi::BLE_MIDI_Manager_cli::BLE_MIDI_Manager_cli(EmbeddedCli* cli_, BLE_MI
     });
     assert(result);
     result = embeddedCliAddBinding(cli, {
+        "btmidi-client-cancel-connect",
+        "blmidi-client-cancel-connect",
+        true,
+        blem_,
+        static_client_cancel_connect
+    });
+    assert(result);
+    result = embeddedCliAddBinding(cli, {
         "btmidi-server-start",
         "leave client mode and enter server mode",
         true,
@@ -163,6 +171,25 @@ void rppicomidi::BLE_MIDI_Manager_cli::static_client_connect(EmbeddedCli *, char
     if (!ble_midi_client_request_connect(idx)) {
         printf("could not connect to index==%u\r\n", idx);
     }
+}
+
+void rppicomidi::BLE_MIDI_Manager_cli::static_client_cancel_connect(EmbeddedCli *, char *args, void *context)
+{
+    auto blem = reinterpret_cast<BLE_MIDI_Manager*>(context);
+    if (embeddedCliGetTokenCount(args) != 0) {
+        printf("blmidi-client-cancel-connect\r\n");
+        return;
+    }
+    if (blem->is_server_mode()) {
+        printf("in server mode; no client connection pending\r\n");
+        return;
+    }
+    if (!ble_midi_client_waiting_for_connection()) {
+        printf("no pending connection request\r\n");
+        return;
+    }
+    ble_midi_client_cancel_connection_request();
+    printf("Canceling pending connection requst\r\n");
 }
 
 void rppicomidi::BLE_MIDI_Manager_cli::static_start_server(EmbeddedCli *, char *args, void *context)
