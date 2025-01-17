@@ -172,6 +172,7 @@ void rppicomidi::Midi2PioUsbhub::serialize(std::string &serialized_string)
     json_object_set_number(bluetooth_object, "last_addr_type", adtyp);
     json_object_set_string(bluetooth_object, "last_addr", bdaddr_str);
     json_object_set_boolean(bluetooth_object, "is_client", blem.is_client_mode());
+    json_object_set_boolean(bluetooth_object, "keep_client_connected", blem.get_keep_client_connected());
     json_object_set_value(root_object, "bluetooth", bluetooth_value);
 #endif
 
@@ -318,6 +319,13 @@ bool rppicomidi::Midi2PioUsbhub::deserialize(std::string &serialized_string)
                 json_value_free(root_value);
                 return false;
             }
+            int keep_client_connected = json_object_get_boolean(bluetooth_object, "keep_client_connected");
+
+            if (keep_client_connected == -1) {
+                // if the setting is missing or invalid, do not quit. Instead just set to false
+                keep_client_connected = 0;
+            }
+            blem.set_keep_client_connected(keep_client_connected == 0 ? false:true);
             blem_is_client = (is_client != 0);
             if (blem_is_client != blem.is_client_mode() || !blem.is_initialized()) {
                 if (blem_is_client) {

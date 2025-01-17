@@ -188,6 +188,8 @@ public:
     bool is_client_mode() {return is_client; }
     bool is_initialized() {return initialized; }
     bool reconnect();
+    bool get_keep_client_connected();
+    void set_keep_client_connected(bool keep_client_connected_);
 private:
     /**
      * @brief called by static_packet_handler to handle BT Stack messages

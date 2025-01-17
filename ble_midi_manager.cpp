@@ -291,4 +291,16 @@ bool rppicomidi::BLE_MIDI_Manager::reconnect()
     return result;
 }
 
+bool rppicomidi::BLE_MIDI_Manager::get_keep_client_connected()
+{
+    return ble_midi_client_get_keep_connected();
+}
+
+void rppicomidi::BLE_MIDI_Manager::set_keep_client_connected(bool keep_client_connected_)
+{
+    auto context = cyw43_arch_async_context();
+    async_context_acquire_lock_blocking(context);
+    ble_midi_client_set_keep_connected(keep_client_connected_);
+    async_context_release_lock(context);
+}
 #endif // ifdef RPPICOMIDI_PICO_W

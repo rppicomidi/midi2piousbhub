@@ -315,11 +315,13 @@ faders      | ! |   |   |
 
 ## save \<preset name\>
 Save the current setup to the given \<preset name\>. If there is already a preset with that
-name, then it will be overwritten.
+name, then it will be overwritten. If the preset name is omitted, then the last saved
+preset is overwritten.
 
 ## load \<preset name\>
 Load the current setup from the given \<preset name\>. If the preset was not previously
-saved using the save command, then print an error message to the console.
+saved using the save command, then print an error message to the console. If the name
+is omitted, then the last saved preset is loaded.
 
 ## backup [\<preset name\>]
 Copy the specified preset to USB flash drive to a file on the drive named `/rppicomidi-midi2usbhub/<preset name>`. If no preset name is given, then all presets are copied to the
@@ -395,5 +397,20 @@ Connect to the specfied device index number from the scan list. Index 0 is the
 last connected device. TODO: right now this is the first device in the bonded
 device list.
 
+## btmidi-client-cancel-connect
+Cancel the pending client mode connection request.
+
+## btmidi-client-keep-connected `[0|1]`
+In client mode, the "keep connected" flag is 1 if the client should immediately
+attempt to reconnect if the currently connected server disconnects. If the
+"keep connected" flag is 0, then if the server disconnects, then the client
+will not attempt to disconnect. If you issue this command with no arguments,
+it will print the current flag state, 0 or 1. This flag is stored as part
+of the settings when you issue the save command.
+
 ## btmidi-server-start
 Leave client mode and enter server mode.
+
+## btmidi-get-state
+Prints Client or Server, Connected or Disconnected
+

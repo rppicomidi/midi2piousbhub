@@ -92,6 +92,14 @@ rppicomidi::BLE_MIDI_Manager_cli::BLE_MIDI_Manager_cli(EmbeddedCli* cli_, BLE_MI
     });
     assert(result);
     result = embeddedCliAddBinding(cli, {
+        "btmidi-client-keep-connected",
+        "blmidi-client-keep-connected [0|1] (sets off, on; no args prints current state)",
+        true,
+        blem_,
+        static_client_keep_connected
+    });
+    assert(result);
+    result = embeddedCliAddBinding(cli, {
         "btmidi-server-start",
         "leave client mode and enter server mode",
         true,
@@ -190,6 +198,24 @@ void rppicomidi::BLE_MIDI_Manager_cli::static_client_cancel_connect(EmbeddedCli 
     }
     ble_midi_client_cancel_connection_request();
     printf("Canceling pending connection requst\r\n");
+}
+
+void rppicomidi::BLE_MIDI_Manager_cli::static_client_keep_connected(EmbeddedCli *, char *args, void *context)
+{
+    auto blem = reinterpret_cast<BLE_MIDI_Manager*>(context);
+    if (embeddedCliGetTokenCount(args) > 1) {
+        printf("blmidi-client-keep-connected [0|1] (no args prints current state)\r\n");
+    }
+    else if (embeddedCliGetTokenCount(args) == 1) {
+        char val = *embeddedCliGetToken(args, 1);
+        if (val == '0' || val == '1') {
+            blem->set_keep_client_connected(val == '1');
+        }
+        else {
+            printf("blmidi-client-keep-connected [0|1] (no args prints current state)\r\n");
+        }
+    }
+    printf("keep client connected is %u\r\n", blem->get_keep_client_connected() ? 1:0);
 }
 
 void rppicomidi::BLE_MIDI_Manager_cli::static_start_server(EmbeddedCli *, char *args, void *context)
