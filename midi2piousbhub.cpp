@@ -506,7 +506,7 @@ void rppicomidi::Midi2PioUsbhub::route_midi(Midi_out_port* out_port, const uint8
     }
     else
     {
-        TU_LOG1("skipping %s dev_addr=%u\r\n", out_port->nickname.c_str(), out_port->devaddr);
+        TU_LOG2("skipping %s dev_addr=%u\r\n", out_port->nickname.c_str(), out_port->devaddr);
     }
 }
 
