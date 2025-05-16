@@ -33,7 +33,6 @@
 #include <string>
 #include "pio_usb.h"
 #include "tusb.h"
-#include "usb_midi_host.h"
 #include "host/usbh_pvt.h"
 #include "embedded_cli.h"
 #include "parson.h"
@@ -92,6 +91,7 @@ namespace rppicomidi
 
         struct Midi_out_port
         {
+            uint8_t devidx;
             uint8_t devaddr;
             uint8_t cable;
             std::string nickname;
@@ -99,6 +99,7 @@ namespace rppicomidi
 
         struct Midi_in_port
         {
+            uint8_t devidx;
             uint8_t devaddr;
             uint8_t cable;
             std::string nickname;
@@ -106,9 +107,9 @@ namespace rppicomidi
         };
         void *midi_uart_instance;
         void tuh_mount_cb(uint8_t dev_addr);
-        void tuh_midi_mount_cb(uint8_t dev_addr, uint8_t in_ep, uint8_t out_ep, uint8_t num_cables_rx, uint16_t num_cables_tx);
-        void tuh_midi_unmount_cb(uint8_t dev_addr, uint8_t instance);
-        void tuh_midi_rx_cb(uint8_t dev_addr, uint32_t num_packets);
+        void tuh_midi_mount_cb(uint8_t dev_idx, uint8_t dev_addr, uint8_t num_cables_rx, uint16_t num_cables_tx);
+        void tuh_midi_unmount_cb(uint8_t dev_idx);
+        void tuh_midi_rx_cb(uint8_t dev_idx, uint32_t num_packets);
         /**
          * @brief create JSON formatted string that represents the current settings
          *
@@ -133,7 +134,7 @@ namespace rppicomidi
 #ifdef RPPICOMIDI_PICO_W
         bool deserialize(std::string &serialized_settings, bool skip_bluetooth);
 #else
-        bool rppicomidi::Midi2PioUsbhub::deserialize(std::string &serialized_string);
+        bool deserialize(std::string &serialized_string);
 #endif
         /**
          * @brief connect the MIDI stream from the device and port from_nickname
@@ -236,5 +237,6 @@ namespace rppicomidi
         #endif
         Midi2PioUsbhub_cli cli;
         bool cdc_state_has_changed;
+        uint8_t idx2addr[CFG_TUH_DEVICE_MAX+1];
     };
 }

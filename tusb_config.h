@@ -147,19 +147,29 @@
 // See README.md Troubleshooting section for more information
 #define CFG_TUH_ENUMERATION_BUFSIZE 512
 
-#define CFG_TUH_HUB                 1 // Enable USB hubs
-#define CFG_TUH_CDC                 0
-#define CFG_TUH_HID                 0 // typical keyboard + mouse device can have 3-4 HID interfaces
-//#define CFG_TUH_MIDI                1 // enable MIDI Host
-#define CFG_TUH_MSC                 1
-#define CFG_TUH_VENDOR              0
 
 // max device support (excluding hub device)
-#define CFG_TUH_DEVICE_MAX          (CFG_TUH_HUB ? 4 : 1) // hub typically has 4 ports
+#define CFG_TUH_HUB                 1 // Enable 1 USB hub
+#define CFG_TUH_DEVICE_MAX          (3*CFG_TUH_HUB + 1) // hub typically has 4 ports
+#define CFG_TUH_CDC                 0
+#define CFG_TUH_HID                 0 // typical keyboard + mouse device can have 3-4 HID interfaces
+#define CFG_TUH_MIDI                CFG_TUH_DEVICE_MAX // enable as many connected MIDI devices as there are host ports
+#define CFG_TUH_MSC                 1
+#define CFG_TUH_VENDOR              0
 
 // MIDI Host string support
 #define CFG_MIDI_HOST_DEVSTRINGS 1
 
+// Fix mismatch between pico-sdk and TinyUSB build system; BOARD=pico-sdk breaks this
+#ifndef PICO_DEFAULT_PIO_USB_DP_PIN
+#define PICO_DEFAULT_PIO_USB_DP_PIN       16
+#endif
+#ifndef PICO_DEFAULT_PIO_USB_VBUSEN_PIN
+#define PICO_DEFAULT_PIO_USB_VBUSEN_PIN   18
+#endif
+#ifndef PICO_DEFAULT_PIO_USB_VBUSEN_STATE
+#define PICO_DEFAULT_PIO_USB_VBUSEN_STATE 1
+#endif
 #ifdef __cplusplus
  }
 #endif

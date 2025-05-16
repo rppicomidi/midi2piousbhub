@@ -7,7 +7,7 @@ control surface, etc.)
 
 This project uses the RP2040 processor's built-in USB port as a USB device
 port for connection to a USB MIDI host like a PC or Mac. It uses the RP2040's
-PIOs plus 2 GPIO pins to create a USB host port, and it uses the RP2040
+PIO 0 plus 2 GPIO pins to create a USB host port, and it uses the RP2040
 processor's built-in UART1 port for serial port MIDI. Bluetooth MIDI uses
 the Pico W's built-in WiFi/Bluetooth module.
 
@@ -21,6 +21,12 @@ the midi2piousbhub software will automatically reload the last saved preset on s
 and when you plug a USB MIDI Device to the host port. You can back up any or all of
 your presets to a USB Flash drive connected to the USB hub. Presets are stored in
 JSON format.
+
+KNOWN ISSUE: At the time of this writing, MIDI device unplug from a USB hub is
+not detected and will confuse the software.
+
+WORKAROUND: Unplug the USB Hub first. Unplug the USB MIDI device second. Finally,
+plug the hub back in. The remaining devices should reconnect.
 
 # Hardware
 My first test circuit used a Raspberry Pi Pico board, a USB A breakout board,
@@ -56,27 +62,14 @@ If you have not already done so, follow the instructions for installing the Rasp
 document. In particular, make sure `PICO_SDK_PATH` is set to the directory where you installed the pico-sdk.
 
 ## Pico W Users: Update the Pico SDK
-At the time of this writing, the Pico C/C++ SDK version is 1.5.1. It has some
-issues with Bluetooth Support that are fixed in the `develop` branch of the pico-sdk.
-To address these issues, please check out the `develop` branch of the pico-sdk and
-get the latest version.
-```
-cd ${PICO_SDK_PATH}
-git checkout -b develop origin/develop
-git pull
-git submodule update -- lib/btstack
-git submodule update -- lib/cyw43-driver
-```
+At the time of this writing, the Pico C/C++ SDK version is 2.1.1. It has fixed some of the issues
+with the Bluetooth that were present in earlier versions. Please use that version or later.
 
-## Use a TinyUSB library version that supports application host drivers
-The USB MIDI host driver is currently not part of the TinyUSB stack. It is an
-application host driver found in this project's `lib/usb_midi_host` directory.
-The Pico SDK uses the main repository for TinyUSB as a git submodule. The version
-of TinyUSB that ships with the Pico SDK 1.5.1 does not support application host
-drivers. That feature was added 15-Aug-2023. You will likely need the latest version
-of the TinyUSB library for this code to work correctly. The following describes
-how to make sure your Pico SDK version's TinyUSB library supports application host
-drivers.
+## Use a TinyUSB library version that supports native USB MIDI Host
+Until recently, TinyUSB did not support USB MIDI Host with its own driver. Recently, that
+changed. Please update to the latest TinyUSB version (May 6, 2025,
+commit 542e5b4550a01d034b78308d77c408ed89427513,
+at the time of this writing in case the latest version does not build).
 
 1. Set the working directory to the tinyusb library and make sure you are on the main branch.
 ```
@@ -87,7 +80,7 @@ git checkout master
 ```
 git log -1
 ```
-3. If the `Date:` is >= 15-Aug-2023, your TinyUSB library should be fine. If not, get the latest
+3. If the version is new enough, do nothing. Otherwise,
 ```
 git pull
 ```
@@ -102,26 +95,13 @@ python tools/get_deps.py rp2040
 ```
 For more information, see the [TinyUSB documentation](https://docs.tinyusb.org/en/latest/reference/getting_started.html#dependencies)
 
-## Update the PIO USB Driver to fix memory corruption
-Until version 0.6.0, the [Pico-PIO-USB](https://github.com/sekigon-gonnoc/Pico-PIO-USB) project consumed
-most of the 32 PIO 0 instructions and all of the PIO 1 instructions. Version 0.6.0 and later
-only uses PIO 0. The CYW43 Bluetooth radio module on the Pico W communicates
-with the Pico W's RP2040 chip via a custom SPI driver implemented in PIO 1.
-Before version Pico-PIO-USB version 0.6.0, I found that the Pico W CYW43 SPI PIO driver
-would lock up from time to time if both PIO USB was active and there was a lot
-of data transfer between the CYW43 module and the RP2040 (such as during Bluetooth
-LE client mode active scanning). Switching to version 0.6.0 seems to have fixed
-most of that issue. However, version 0.6.1 fixed a memory corruption issue, so
-it is better to have that one or later.
+Note that on some OS installations, you have to type `python3` instead of `python` to invoke the python 3
+interpreter. It depends on your installation.
 
-To get version Pico-PIO-USB 0.6.1 into your TinyUSB library, make sure you first
-installed PIO USB support for TinyUSB as described in the previous section.
-Then type the following instructions at a command prompt:
-```
-cd ${PICO_SDK_PATH}/lib/tinyusb/hw/mcu/raspberry_pi/Pico-PIO-USB
-git pull
-git checkout 0.6.1
-```
+At the time of this writing, this will install Pico PIO USB commit 810653f66adadba3e0e4b4b56d5167ac4f7fdbf7
+from March 25, 2025. This version of code has the MIDI device unplug detect issue as noted above.
+Subsequent versions seem to introduce other issues in my testing. This could change (hopefully for
+the better) as Pico-PIO-USB and TinyUSB development progresses.
 
 ## Get the project code
 Clone the midi2piousbhub project to a directory at the same level as the pico-sdk directory.
@@ -140,7 +120,21 @@ If your system is based on a Pico W board, enter this command first
 ```
 export PICO_BOARD=pico_w
 ```
-For all boards, enter this commands.
+
+If your system is based on a Adafruit Feather RP2040 with USB A Host,
+enter this command first
+```
+export PICO_BOARD=adafruit_feather_rp2040_usb_host
+```
+
+If your system is based on a Pico board, enter this command first
+```
+export PICO_BOARD=pico
+```
+Other RP2040 and RP2350 boards have not been tested. Substitute
+your board after the `PICO_BOARD=` if your board is not listed.
+
+Next, enter these commands.
 
 ```
 export PICO_SDK_PATH=${PICO_MIDI_PROJECTS}/pico-sdk/

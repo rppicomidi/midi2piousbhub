@@ -1,9 +1,10 @@
 cmake_minimum_required(VERSION 3.13)
 
-set(BOARD pico_sdk)
 # Set the TinyUSB log level
-# set(LOG 2)
+# set(LOG 1)
+
 include(pico_sdk_import.cmake)
+
 
 set(target_proj midi2piousbhub)
 project(midi2piousbhub C CXX ASM)
@@ -42,11 +43,11 @@ target_include_directories(midi2piousbhub PRIVATE
 
 target_link_options(midi2piousbhub PRIVATE -Xlinker --print-memory-usage)
 target_compile_options(midi2piousbhub PRIVATE -Wall -Wextra -DPICO_HEAP_SIZE=0x20000)
-target_link_libraries(midi2piousbhub midi_uart_lib tinyusb_host tinyusb_device tinyusb_board usb_midi_host_app_driver ring_buffer_lib pico_stdlib
+target_link_libraries(midi2piousbhub midi_uart_lib tinyusb_host tinyusb_device tinyusb_board ring_buffer_lib pico_stdlib
 littlefs-lib msc_fatfs rp2040_rtc pico_multicore tinyusb_pico_pio_usb cdc_stdio_lib)
 if(DEFINED PICO_BOARD)
 if(${PICO_BOARD} MATCHES "pico_w")
-message("board is pico_w")
+message("PICO_BOARD is pico_w")
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/lib/pico-w-ble-midi-lib)
 
 # add additional compile and link options
@@ -74,10 +75,10 @@ target_sources(midi2piousbhub PRIVATE
 set(RPPICOMIDI_PICO_W 1)
 pico_btstack_make_gatt_header(midi2piousbhub PRIVATE "${CMAKE_CURRENT_LIST_DIR}/ble_midi_profile.gatt" "${CMAKE_CURRENT_LIST_DIR}/lib/pico-w-ble-midi-lib")
 else()
-message("board is pico")
+message("PICO_BOARD is" ${PICO_BOARD})
 endif()
 else()
-message("board is not defined")
+message("PICO_BOARD is not defined")
 endif()
 
 pico_add_extra_outputs(midi2piousbhub)

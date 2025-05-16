@@ -459,10 +459,10 @@ void rppicomidi::Midi2PioUsbhub::flush_usb_tx()
         // Call tuh_midi_stream_flush() once per output port device address
         uint32_t port_mask = 1 << out_port->devaddr;
         if (out_port->devaddr <= CFG_TUH_DEVICE_MAX &&
-            (port_flushed_mask && port_mask) == 0 &&
-            tuh_midi_configured(out_port->devaddr))
+            (port_flushed_mask & port_mask) == 0 &&
+            tuh_midi_mounted(out_port->devidx))
         {
-            tuh_midi_stream_flush(out_port->devaddr);
+            tuh_midi_write_flush(out_port->devidx);
             port_flushed_mask |= port_mask;
         }
     }
@@ -470,13 +470,18 @@ void rppicomidi::Midi2PioUsbhub::flush_usb_tx()
 
 void rppicomidi::Midi2PioUsbhub::route_midi(Midi_out_port* out_port, const uint8_t* buffer, uint32_t bytes_read)
 {
+    //printf("routing midi to addr=%u configured=%s\r\n", out_port->devaddr, attached_devices[out_port->devaddr].configured ? "TRUE":"FALSE");
     if (out_port->devaddr != 0 && attached_devices[out_port->devaddr].configured)
     {
         if (out_port->devaddr < uart_devaddr)
         {
-            uint32_t nwritten = tuh_midi_stream_write(out_port->devaddr, out_port->cable, buffer, bytes_read);
+            uint32_t nwritten = tuh_midi_stream_write(out_port->devidx, out_port->cable, buffer, bytes_read);
             if (nwritten != bytes_read) {
                 TU_LOG1("Warning: Dropped %lu bytes sending to %s\r\n", bytes_read - nwritten, out_port->nickname.c_str());
+            }
+            else {
+                TU_LOG2("Wrote %lu bytes to addr=%u idx=%u\r\n", nwritten, out_port->devaddr, out_port->devidx);
+                TU_LOG2_BUF(buffer, bytes_read);
             }
         }
         else if (out_port->devaddr == uart_devaddr)
@@ -636,6 +641,7 @@ rppicomidi::Midi2PioUsbhub::Midi2PioUsbhub() : cli{&preset_manager}
     midi_out_port_list.push_back(&usbdev_midi_out_port);
     midi_in_port_list.push_back(&ble_midi_in_port);
     midi_out_port_list.push_back(&ble_midi_out_port);
+    memset(idx2addr, 0, sizeof(idx2addr));
     preset_manager.init();
 
     cli.printWelcome();
@@ -774,7 +780,11 @@ int main()
     while(core1_booting) {
     }
     rppicomidi::Midi2PioUsbhub &instance = rppicomidi::Midi2PioUsbhub::instance();
+#ifdef RPPICOMIDI_PICO_W
     instance.load_current_preset(false);
+#else
+    instance.load_current_preset();
+#endif
     core0_booting = false;
     while (1) {
         instance.task();
@@ -840,8 +850,13 @@ void rppicomidi::Midi2PioUsbhub::prod_str_cb(tuh_xfer_t *xfer)
                                                  midi_out->cable, false);
             }
         }
+#ifdef RPPICOMIDI_PICO_W
         instance().load_current_preset(true);
+#else
+        instance().load_current_preset();
+#endif
         devinfo->configured = true;
+        //printf("device at addr=%u is configured\n", xfer->daddr);
     }
 }
 
@@ -854,16 +869,16 @@ void rppicomidi::Midi2PioUsbhub::langid_cb(tuh_xfer_t *xfer)
     }
 }
 
-void rppicomidi::Midi2PioUsbhub::tuh_midi_mount_cb(uint8_t dev_addr, uint8_t in_ep, uint8_t out_ep, uint8_t num_cables_rx, uint16_t num_cables_tx)
+void rppicomidi::Midi2PioUsbhub::tuh_midi_mount_cb(uint8_t dev_idx, uint8_t dev_addr, uint8_t num_cables_rx, uint16_t num_cables_tx)
 {
-    (void)in_ep;
-    (void)out_ep;
-    TU_LOG2("MIDI device address = %u, IN endpoint %u has %u cables, OUT endpoint %u has %u cables\r\n",
-            dev_addr, in_ep & 0xf, num_cables_rx, out_ep & 0xf, num_cables_tx);
+    TU_LOG1("idx=%u MIDI device address = %u, IN endpoint has %u cables, OUT endpoint has %u cables\r\n",
+            dev_idx, dev_addr, num_cables_rx, num_cables_tx);
+    idx2addr[dev_idx]=dev_addr;
     // As many MIDI IN ports and MIDI OUT ports as required
     for (uint8_t cable = 0; cable < num_cables_rx; cable++)
     {
         auto port = new Midi_in_port;
+        port->devidx = dev_idx;
         port->cable = cable;
         port->devaddr = dev_addr;
 
@@ -873,15 +888,16 @@ void rppicomidi::Midi2PioUsbhub::tuh_midi_mount_cb(uint8_t dev_addr, uint8_t in_
     {
         auto port = new Midi_out_port;
         port->cable = cable;
+        port->devidx = dev_idx;
         port->devaddr = dev_addr;
 
         midi_out_port_list.push_back(port);
     }
 }
 
-void tuh_midi_mount_cb(uint8_t dev_addr, uint8_t in_ep, uint8_t out_ep, uint8_t num_cables_rx, uint16_t num_cables_tx)
+void tuh_midi_mount_cb(uint8_t idx, const tuh_midi_mount_cb_t* mount_cb_data)
 {
-    rppicomidi::Midi2PioUsbhub::instance().tuh_midi_mount_cb(dev_addr, in_ep, out_ep, num_cables_rx, num_cables_tx);
+    rppicomidi::Midi2PioUsbhub::instance().tuh_midi_mount_cb(idx, mount_cb_data->daddr, mount_cb_data->rx_cable_count, mount_cb_data->tx_cable_count);
 }
 
 void rppicomidi::Midi2PioUsbhub::tuh_mount_cb(uint8_t dev_addr)
@@ -901,9 +917,11 @@ void tuh_mount_cb(uint8_t dev_addr)
 }
 
 // Invoked when device with MIDI interface is un-mounted
-void rppicomidi::Midi2PioUsbhub::tuh_midi_unmount_cb(uint8_t dev_addr, uint8_t)
+void rppicomidi::Midi2PioUsbhub::tuh_midi_unmount_cb(uint8_t dev_idx)
 {
-    for (std::vector<Midi_in_port *>::iterator it = midi_in_port_list.begin(); it != midi_in_port_list.end();)
+    uint8_t dev_addr = idx2addr[dev_idx];
+    TU_LOG1("Unmount MIDI device idx=%u addr=%u\r\n", dev_idx, dev_addr)
+;    for (std::vector<Midi_in_port *>::iterator it = midi_in_port_list.begin(); it != midi_in_port_list.end();)
     {
         if ((*it)->devaddr == dev_addr)
         {
@@ -970,29 +988,33 @@ void rppicomidi::Midi2PioUsbhub::tuh_midi_unmount_cb(uint8_t dev_addr, uint8_t)
     attached_devices[dev_addr].pid = 0;
     attached_devices[dev_addr].rx_cables = 0;
     attached_devices[dev_addr].tx_cables = 0;
+    idx2addr[dev_idx] = 0;
 }
 
-void tuh_midi_umount_cb(uint8_t dev_addr, uint8_t instance)
+void tuh_midi_umount_cb(uint8_t idx)
 {
-    rppicomidi::Midi2PioUsbhub::instance().tuh_midi_unmount_cb(dev_addr, instance);
+    rppicomidi::Midi2PioUsbhub::instance().tuh_midi_unmount_cb(idx);
 }
 
-void rppicomidi::Midi2PioUsbhub::tuh_midi_rx_cb(uint8_t dev_addr, uint32_t num_packets)
+void rppicomidi::Midi2PioUsbhub::tuh_midi_rx_cb(uint8_t dev_idx, uint32_t num_packets)
 {
     if (num_packets != 0)
     {
+        uint8_t dev_addr = idx2addr[dev_idx];
         uint8_t cable_num;
         uint8_t buffer[48];
         while (1)
         {
-            uint32_t bytes_read = tuh_midi_stream_read(dev_addr, &cable_num, buffer, sizeof(buffer));
+            uint32_t bytes_read = tuh_midi_stream_read(dev_idx, &cable_num, buffer, sizeof(buffer));
             if (bytes_read == 0)
                 return;
             // Route the MIDI stream to the correct MIDI OUT port
+            //printf("Received %lu bytes dev_addr=%u\r\n ", bytes_read, dev_addr);
             for (auto &in_port : midi_in_port_list)
             {
                 if (in_port->devaddr == dev_addr && in_port->cable == cable_num)
                 {
+                    //printf("routing MIDI from addr %u\r\n", dev_addr);
                     for (auto &out_port : in_port->sends_data_to_list)
                     {
                         route_midi(out_port, buffer, bytes_read);
@@ -1004,12 +1026,8 @@ void rppicomidi::Midi2PioUsbhub::tuh_midi_rx_cb(uint8_t dev_addr, uint32_t num_p
     }
 }
 
-void tuh_midi_rx_cb(uint8_t dev_addr, uint32_t num_packets)
+void tuh_midi_rx_cb(uint8_t dev_idx, uint32_t num_packets)
 {
-    rppicomidi::Midi2PioUsbhub::instance().tuh_midi_rx_cb(dev_addr, num_packets);
+    rppicomidi::Midi2PioUsbhub::instance().tuh_midi_rx_cb(dev_idx, num_packets);
 }
 
-void tuh_midi_tx_cb(uint8_t dev_addr)
-{
-    (void)dev_addr;
-}
