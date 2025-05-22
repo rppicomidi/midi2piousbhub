@@ -17,7 +17,6 @@ add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/ext_lib/littlefs-lib ext_lib/littlefs
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/ext_lib/fatfs/source)
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/lib/midi_uart_lib)
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/lib/rp2040_rtc)
-add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/lib/usb_midi_host)
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/lib/cdc_stdio_lib)
 
 set(EMBEDDED_CLI_PATH ${CMAKE_CURRENT_LIST_DIR}/ext_lib/embedded-cli/lib/)
