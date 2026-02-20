@@ -1,10 +1,11 @@
 /**
  * @file rp2040_rtc.h
  * @brief this class is a wrapper for managing the RP2040 real-time clock
+ * or the RP2350 always-on timer, as required.
  *
  * MIT License
  *
- * Copyright (c) 2022 rppicomidi
+ * Copyright (c) 2022, 2026 rppicomidi
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,7 +26,6 @@
  * SOFTWARE.
  */
 #include <cstdint>
-#include "hardware/rtc.h"
 #include "pico/stdlib.h"
 #include "pico/util/datetime.h"
 namespace rppicomidi
@@ -163,6 +163,12 @@ private:
      * @return false otherwsie
      */
     bool day_ok_for_month(uint16_t year, uint8_t month, uint8_t day);
+
+    /**
+     * @param month the month from 1-12
+     * @param day the day from 1 to 31
+     */
+    uint16_t get_day_of_the_year(uint16_t year, uint8_t month, uint8_t day);
     static const char* const month_name[];
 };
 }
